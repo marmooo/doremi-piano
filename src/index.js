@@ -1642,7 +1642,7 @@ let perfectCount = 0;
 let greatCount = 0;
 let firstRun = true;
 let mouseDowned = false;
-loadConfig();
+
 if (location.search) {
   loadMIDIFromUrlParams();
 } else {

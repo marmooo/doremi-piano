@@ -1,14 +1,10 @@
-const cacheName = "2026-05-02 00:00";
+const cacheName = "2026-07-06 00:00";
 const urlsToCache = [
   "/doremi-piano/index.js",
-  "/doremi-piano/abt.mid",
-  "/doremi-piano/instruments.lst",
   "/doremi-piano/favicon/favicon.svg",
-  "https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js",
-  "https://cdn.jsdelivr.net/combine/npm/tone@14.7.77,npm/@magenta/music@1.23.1/es6/core.js",
-  "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/dist/js-synthesizer.min.js",
-  "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/dist/js-synthesizer.worklet.min.js",
-  "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/externals/libfluidsynth-2.3.0-with-libsndfile.min.js",
+  "https://marmooo.github.io/midi-player/midi-player-icons.woff2",
+  "https://soundfonts.pages.dev/GeneralUser_GS_v1.471/000.sf3",
+  "https://soundfonts.pages.dev/GeneralUser_GS_v1.471/128.sf3",
 ];
 
 async function preCache() {

@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
   <head prefix="og: http://ogp.me/ns#">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="A Piano-style MPE MIDI controller powered by Midy.">
+  <meta name="description" content="ピアノ型の MPE MIDI コントローラーです。(powered by Midy)">
     <title>Doremi Piano</title>
     <meta property="og:title" content="Doremi Piano">
     <meta property="og:site_name" content="Doremi Piano">
-    <meta property="og:description" content="A Piano-style MPE MIDI controller powered by Midy.">
+    <meta property="og:description" content="ピアノ型の MPE MIDI コントローラーです。(powered by Midy)">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://marmooo.github.io/doremi-piano/">
     <meta property="og:image" content="https://marmooo.github.io/doremi-piano/favicon/apple-touch-icon.png">
@@ -117,76 +117,76 @@
             Doremi Piano
           </a>
           <div class="navbar-nav align-items-center">
-            <select title="language" id="lang" class="form-select form-select-sm">
-              <option value="ja">日本語</option>
-              <option value="en" selected>English</option>
+            <select title="言語" id="lang" class="form-select form-select-sm">
+              <option value="ja" selected>日本語</option>
+              <option value="en">English</option>
             </select>
-            <button title="toggle hand mode" id="toggleHandMode" class="fs-4 btn p-0 ms-1" type="button">1️⃣</button>
-            <button title="toggle dark-mode" id="toggleDarkMode" class="fs-4 btn p-0 ms-1" type="button">🌓</button>
+            <button title="片手/両手モード切替" id="toggleHandMode" class="fs-4 btn p-0 ms-1" type="button">1️⃣</button>
+            <button title="ダークモード切替" id="toggleDarkMode" class="fs-4 btn p-0 ms-1" type="button">🌓</button>
           </div>
         </div>
       </nav>
     </header>
     <main class="container">
       <noscript>
-        <div class="alert alert-warning">Please turn on JavaScript.</div>
+        <div class="alert alert-warning">JavaScript を ON にしてください</div>
       </noscript>
       <div id="panel" class="panel single">
         <div class="group first"></div>
         <div class="group second"></div>
       </div>
       <details id="config" class="pt-3" open>
-        <summary>Configuration</summary>
+        <summary>設定</summary>
         <div class="row text-nowrap">
           <div class="col">
             <form>
               <label class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="mode-first" value="noteOn" checked>
-                <span class="form-check-label">NoteOn</span>
+                <span class="form-check-label">ノートオン</span>
               </label>
               <label class="form-check form-check-inline form-check-label">
                 <input class="form-check-input" type="radio" name="mode-first" value="bend">
-                <span class="form-check-label">PitchBend</span>
+                <span class="form-check-label">ピッチベンド</span>
               </label>
             </form>
             <form>
               <label class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="effect" value="expression" checked>
-                <span class="form-check-label">Expression</span>
+                <span class="form-check-label">音量</span>
               </label>
               <label class="form-check form-check-inline form-check-label">
                 <input class="form-check-input" type="radio" name="effect" value="brightness">
-                <span class="form-check-label">Brightness</span>
+                <span class="form-check-label">音色</span>
               </label>
             </form>
             <label class="form-check form-switch d-inline-block">
               <input class="form-check-input" type="checkbox" role="switch" id="drum">
-              <span class="form-check-label">Drum</span>
+              <span class="form-check-label">ドラム</span>
             </label>
             <label class="d-flex py-1">
-              <span class="form-label pe-2">Instrument</span>
+              <span class="form-label pe-2">楽器</span>
               <midi-instrument id="instrument-first" class="w-100"></midi-instrument>
             </label>
             <label class="d-flex">
-              <span class="form-label pe-2">Modulation</span>
+              <span class="form-label pe-2">転調</span>
               <input class="form-range" type="range" value="0" min="0" max="127">
             </label>
             <details>
-              <summary>Vibrato</summary>
+              <summary>ビブラート</summary>
               <table class="table table-sm table-striped">
                 <tbody>
-                  <tr><td>Rate</td><td><input class="form-range" type="range" value="64" min="0" max="127"></td></tr>
-                  <tr><td>Depth</td><td><input class="form-range" type="range" value="64" min="0" max="127"></td></tr>
-                  <tr><td>Delay</td><td><input class="form-range" type="range" value="64" min="0" max="127"></td></tr>
+                  <tr><td>レイト</td><td><input class="form-range" type="range" value="64" min="0" max="127"></td></tr>
+                  <tr><td>デプス</td><td><input class="form-range" type="range" value="64" min="0" max="127"></td></tr>
+                  <tr><td>ディレイ</td><td><input class="form-range" type="range" value="64" min="0" max="127"></td></tr>
                 </tbody>
               </table>
             </details>
             <label class="d-flex">
-              <span class="form-label pe-2">Reverb</span>
+              <span class="form-label pe-2">リバーブ</span>
               <input class="form-range" type="range" value="0" min="0" max="127">
             </label>
             <label class="d-flex">
-              <span class="form-label pe-2">Chorus</span>
+              <span class="form-label pe-2">コーラス</span>
               <input class="form-range" type="range" value="0" min="0" max="127">
             </label>
           </div>
@@ -194,51 +194,51 @@
             <form>
               <label class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="mode-second" value="noteOn" checked>
-                <span class="form-check-label">NoteOn</span>
+                <span class="form-check-label">ノートオン</span>
               </label>
               <label class="form-check form-check-inline form-check-label">
                 <input class="form-check-input" type="radio" name="mode-second" value="bend">
-                <span class="form-check-label">Bend</span>
+                <span class="form-check-label">ベンド</span>
               </label>
             </form>
             <form>
               <label class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="effect" value="expression" checked>
-                <span class="form-check-label">Expression</span>
+                <span class="form-check-label">音量</span>
               </label>
               <label class="form-check form-check-inline form-check-label">
                 <input class="form-check-input" type="radio" name="effect" value="brightness">
-                <span class="form-check-label">Brightness</span>
+                <span class="form-check-label">音色</span>
               </label>
             </form>
             <label class="form-check form-switch d-inline-block">
               <input class="form-check-input" type="checkbox" role="switch" id="drum">
-              <span class="form-check-label">Drum</span>
+              <span class="form-check-label">ドラム</span>
             </label>
             <label class="d-flex py-1">
-              <span class="form-label pe-2">Instrument</span>
+              <span class="form-label pe-2">楽器</span>
               <midi-instrument id="instrument-second" class="w-100"></midi-instrument>
             </label>
             <label class="d-flex">
-              <span class="form-label pe-2">Modulation</span>
+              <span class="form-label pe-2">転調</span>
               <input class="form-range" type="range" value="64" min="0" max="127">
             </label>
             <details>
-              <summary>Vibrato</summary>
+              <summary>ビブラート</summary>
               <table class="table table-sm table-striped">
                 <tbody>
-                  <tr><td>Rate</td><td><input class="form-range" type="range" value="64" min="0" max="127"></td></tr>
-                  <tr><td>Depth</td><td><input class="form-range" type="range" value="64" min="0" max="127"></td></tr>
-                  <tr><td>Delay</td><td><input class="form-range" type="range" value="64" min="0" max="127"></td></tr>
+                  <tr><td>レイト</td><td><input class="form-range" type="range" value="64" min="0" max="127"></td></tr>
+                  <tr><td>デプス</td><td><input class="form-range" type="range" value="64" min="0" max="127"></td></tr>
+                  <tr><td>ディレイ</td><td><input class="form-range" type="range" value="64" min="0" max="127"></td></tr>
                 </tbody>
               </table>
             </details>
             <label class="d-flex">
-              <span class="form-label pe-2">Reverb</span>
+              <span class="form-label pe-2">リバーブ</span>
               <input class="form-range" type="range" value="0" min="0" max="127">
             </label>
             <label class="d-flex">
-              <span class="form-label pe-2">Chorus</span>
+              <span class="form-label pe-2">コーラス</span>
               <input class="form-range" type="range" value="0" min="0" max="127">
             </label>
           </div>
@@ -255,134 +255,134 @@
     </footer>
     <template id="midi-instrument">
       <select class="form-select form-select-sm">
-        <option>000 Acoustic Piano</option>
-        <option>001 Bright Piano</option>
-        <option>002 Electric Grand Piano</option>
-        <option>003 Honky-tonk Piano</option>
-        <option>004 Electric Piano</option>
-        <option>005 Electric Piano 2</option>
-        <option>006 Harpsichord</option>
-        <option>007 Clavi</option>
-        <option>008 Celesta</option>
-        <option>009 Glockenspiel</option>
-        <option>010 Music box</option>
-        <option>011 Vibraphone</option>
-        <option>012 Marimba</option>
-        <option>013 Xylophone</option>
-        <option>014 Tubular Bell</option>
-        <option>015 Dulcimer</option>
-        <option>016 Drawbar Organ</option>
-        <option>017 Percussive Organ</option>
-        <option>018 Rock Organ</option>
-        <option>019 Church organ</option>
-        <option>020 Reed organ</option>
-        <option>021 Accordion</option>
-        <option>022 Harmonica</option>
-        <option>023 Tango Accordion</option>
-        <option>024 Acoustic Guitar (nylon)</option>
-        <option>025 Acoustic Guitar (steel)</option>
-        <option>026 Electric Guitar (jazz)</option>
-        <option>027 Electric Guitar (clean)</option>
-        <option>028 Electric Guitar (muted)</option>
-        <option>029 Overdriven Guitar</option>
-        <option>030 Distortion Guitar</option>
-        <option>031 Guitar harmonics</option>
-        <option>032 Acoustic Bass</option>
-        <option>033 Electric Bass (finger)</option>
-        <option>034 Electric Bass (pick)</option>
-        <option>035 Fretless Bass</option>
-        <option>036 Slap Bass 1</option>
-        <option>037 Slap Bass 2</option>
-        <option>038 Synth Bass 1</option>
-        <option>039 Synth Bass 2</option>
-        <option>040 Violin</option>
-        <option>041 Viola</option>
-        <option>042 Cello</option>
-        <option>043 Double bass</option>
-        <option>044 Tremolo Strings</option>
-        <option>045 Pizzicato Strings</option>
-        <option>046 Orchestral Harp</option>
-        <option>047 Timpani</option>
-        <option>048 String Ensemble 1</option>
-        <option>049 String Ensemble 2</option>
-        <option>050 Synth Strings 1</option>
-        <option>051 Synth Strings 2</option>
-        <option>052 Voice Aahs</option>
-        <option>053 Voice Oohs</option>
-        <option>054 Synth Voice</option>
-        <option>055 Orchestra Hit</option>
-        <option>056 Trumpet</option>
-        <option>057 Trombone</option>
-        <option>058 Tuba</option>
-        <option>059 Muted Trumpet</option>
-        <option>060 French horn</option>
-        <option>061 Brass Section</option>
-        <option>062 Synth Brass 1</option>
-        <option>063 Synth Brass 2</option>
-        <option>064 Soprano Sax</option>
-        <option>065 Alto Sax</option>
-        <option>066 Tenor Sax</option>
-        <option>067 Baritone Sax</option>
-        <option>068 Oboe</option>
-        <option>069 English Horn</option>
-        <option>070 Bassoon</option>
-        <option>071 Clarinet</option>
-        <option>072 Piccolo</option>
-        <option>073 Flute</option>
-        <option>074 Recorder</option>
-        <option>075 Pan Flute</option>
-        <option>076 Blown Bottle</option>
-        <option>077 Shakuhachi</option>
-        <option>078 Whistle</option>
-        <option>079 Ocarina</option>
-        <option>080 Lead 1 (square)</option>
-        <option>081 Lead 2 (sawtooth)</option>
-        <option>082 Lead 3 (calliope)</option>
-        <option>083 Lead 4 (chiff)</option>
-        <option>084 Lead 5 (charang)</option>
-        <option>085 Lead 6 (voice)</option>
-        <option>086 Lead 7 (fifths)</option>
-        <option>087 Lead 8 (bass + lead)</option>
-        <option>088 Pad 1 (Fantasia)</option>
-        <option>089 Pad 2 (warm)</option>
-        <option>090 Pad 3 (polysynth)</option>
-        <option>091 Pad 4 (choir)</option>
-        <option>092 Pad 5 (bowed)</option>
-        <option>093 Pad 6 (metallic)</option>
-        <option>094 Pad 7 (halo)</option>
-        <option>095 Pad 8 (sweep)</option>
-        <option>096 FX 1 (rain)</option>
-        <option>097 FX 2 (soundtrack)</option>
-        <option>098 FX 3 (crystal)</option>
-        <option>099 FX 4 (atmosphere)</option>
-        <option>100 FX 5 (brightness)</option>
-        <option>101 FX 6 (goblins)</option>
-        <option>102 FX 7 (echoes)</option>
-        <option>103 FX 8 (sci-fi)</option>
-        <option>104 Sitar</option>
-        <option>105 Banjo</option>
-        <option>106 Shamisen</option>
-        <option>107 Koto</option>
-        <option>108 Kalimba</option>
-        <option>109 Bagpipe</option>
-        <option>110 Fiddle</option>
-        <option>111 Shanai</option>
-        <option>112 Tinkle Bell</option>
-        <option>113 Agogo</option>
-        <option>114 Steel Drums</option>
-        <option>115 Woodblock</option>
-        <option>116 Taiko Drum</option>
-        <option>117 Melodic Tom</option>
-        <option>118 Synth Drum</option>
-        <option>119 Reverse Cymbal</option>
-        <option>120 Guitar Fret Noise</option>
-        <option>121 Breath Noise</option>
-        <option>122 Seashore</option>
-        <option>123 Bird Tweet</option>
-        <option>124 Telephone Ring</option>
-        <option>125 Helicopter</option>
-        <option>126 Applause</option>
-        <option>127 Gunshot</option>
+        <option>000 アコースティックピアノ</option>
+        <option>001 ブライトピアノ</option>
+        <option>002 エレクトリック・グランドピアノ</option>
+        <option>003 ホンキートンクピアノ</option>
+        <option>004 エレクトリックピアノ</option>
+        <option>005 FMエレクトリックピアノ</option>
+        <option>006 ハープシコード</option>
+        <option>007 クラビネット</option>
+        <option>008 チェレスタ</option>
+        <option>009 グロッケンシュピール</option>
+        <option>010 オルゴール</option>
+        <option>011 ヴィブラフォン</option>
+        <option>012 マリンバ</option>
+        <option>013 シロフォン</option>
+        <option>014 チューブラーベル</option>
+        <option>015 ダルシマー</option>
+        <option>016 ドローバーオルガン</option>
+        <option>017 パーカッシブオルガン</option>
+        <option>018 ロックオルガン</option>
+        <option>019 チャーチオルガン</option>
+        <option>020 リードオルガン</option>
+        <option>021 アコーディオン</option>
+        <option>022 ハーモニカ</option>
+        <option>023 タンゴアコーディオン</option>
+        <option>024 アコースティックギター (ナイロン弦)</option>
+        <option>025 アコースティックギター (スチール弦)</option>
+        <option>026 ジャズギター</option>
+        <option>027 クリーンギター</option>
+        <option>028 ミュートギター</option>
+        <option>029 オーバードライブギター</option>
+        <option>030 ディストーションギター</option>
+        <option>031 ギターハーモニクス</option>
+        <option>032 アコースティックベース</option>
+        <option>033 フィンガー・ベース</option>
+        <option>034 ピック・ベース</option>
+        <option>035 フレットレスベース</option>
+        <option>036 スラップベース 1</option>
+        <option>037 スラップベース 2</option>
+        <option>038 シンセベース 1</option>
+        <option>039 シンセベース 2</option>
+        <option>040 ヴァイオリン</option>
+        <option>041 ヴィオラ</option>
+        <option>042 チェロ</option>
+        <option>043 コントラバス</option>
+        <option>044 トレモロ</option>
+        <option>045 ピッチカート</option>
+        <option>046 ハープ</option>
+        <option>047 ティンパニ</option>
+        <option>048 ストリングアンサンブル</option>
+        <option>049 スローストリングアンサンブル</option>
+        <option>050 シンセストリングス</option>
+        <option>051 シンセストリングス2</option>
+        <option>052 声「アー」</option>
+        <option>053 声「ドゥー」</option>
+        <option>054 シンセヴォイス</option>
+        <option>055 オーケストラヒット</option>
+        <option>056 トランペット</option>
+        <option>057 トロンボーン</option>
+        <option>058 チューバ</option>
+        <option>059 ミュートトランペット</option>
+        <option>060 フレンチ・ホルン</option>
+        <option>061 ブラスセクション</option>
+        <option>062 シンセブラス 1</option>
+        <option>063 シンセブラス 2</option>
+        <option>064 ソプラノサックス</option>
+        <option>065 アルトサックス</option>
+        <option>066 テナーサックス</option>
+        <option>067 バリトンサックス</option>
+        <option>068 オーボエ</option>
+        <option>069 イングリッシュホルン</option>
+        <option>070 ファゴット</option>
+        <option>071 クラリネット</option>
+        <option>072 ピッコロ</option>
+        <option>073 フルート</option>
+        <option>074 リコーダー</option>
+        <option>075 パンフルート</option>
+        <option>076 ブロウンボトル (吹きガラス瓶)</option>
+        <option>077 尺八</option>
+        <option>078 口笛</option>
+        <option>079 オカリナ</option>
+        <option>080 正方波</option>
+        <option>081 ノコギリ波</option>
+        <option>082 カリオペリード</option>
+        <option>083 チフリード</option>
+        <option>084 チャランゴリード</option>
+        <option>085 声リード</option>
+        <option>086 フィフスズリード</option>
+        <option>087 ベース + リード</option>
+        <option>088 ファンタジア</option>
+        <option>089 ウォーム</option>
+        <option>090 ポリシンセ</option>
+        <option>091 クワイア</option>
+        <option>092 ボウ</option>
+        <option>093 メタリック</option>
+        <option>094 ハロー</option>
+        <option>095 スウィープ</option>
+        <option>096 雨</option>
+        <option>097 サウンドトラック</option>
+        <option>098 クリスタル</option>
+        <option>099 アトモスフィア</option>
+        <option>100 ブライトネス</option>
+        <option>101 ゴブリン</option>
+        <option>102 エコー</option>
+        <option>103 サイファイ</option>
+        <option>104 シタール</option>
+        <option>105 バンジョー</option>
+        <option>106 三味線</option>
+        <option>107 琴</option>
+        <option>108 カリンバ</option>
+        <option>109 バグパイプ</option>
+        <option>110 フィドル</option>
+        <option>111 シャハナーイ</option>
+        <option>112 ティンクルベル</option>
+        <option>113 アゴゴ</option>
+        <option>114 スチールドラム</option>
+        <option>115 ウッドブロック</option>
+        <option>116 太鼓</option>
+        <option>117 メロディックタム</option>
+        <option>118 シンセドラム</option>
+        <option>119 逆シンバル</option>
+        <option>120 ギターフレットノイズ</option>
+        <option>121 ブレスノイズ</option>
+        <option>122 海岸</option>
+        <option>123 鳥の囀り</option>
+        <option>124 電話のベル</option>
+        <option>125 ヘリコプター</option>
+        <option>126 拍手</option>
+        <option>127 銃声</option>
       </select>
     </template>
     <div class="drop-inline-css d-none form-select form-select-sm

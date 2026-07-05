@@ -1,3 +1,5 @@
+import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.5.7/dist/midy.min.js";
+
 function toggleDarkMode() {
   const html = document.documentElement;
   const newTheme = html.getAttribute("data-bs-theme") === "dark"
@@ -7,1683 +9,1092 @@ function toggleDarkMode() {
   localStorage.setItem("darkMode", newTheme);
 }
 
-function getRandomInt(min, max) {
-  min = Math.ceil(min);
-  max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min)) + min;
-}
-
-function getRectColor() {
-  if (colorful) {
-    const r = getRandomInt(0, 127);
-    const g = getRandomInt(0, 127);
-    const b = getRandomInt(0, 127);
-    return `${r}, ${g}, ${b}`;
+function toggleHandMode(event) {
+  panel.classList.toggle("single");
+  if (handMode === 1) {
+    handMode = 2;
+    event.target.textContent = "2️⃣";
   } else {
-    return "0, 127, 255";
+    handMode = 1;
+    event.target.textContent = "1️⃣";
   }
+  applyOrientation();
 }
 
-function setRectColor() {
-  [...visualizer.svg.children].forEach((rect) => {
-    const color = getRectColor();
-    rect.setAttribute("fill", `rgba(${color}, 1)`);
-  });
+function changeLang() {
+  const langObj = document.getElementById("lang");
+  const lang = langObj.options[langObj.selectedIndex].value;
+  location.href = `/doremi-piano/${lang}/`;
 }
 
-function toggleRectColor() {
-  colorful = !colorful;
-  setRectColor();
-}
-
-function dropFileEvent(event) {
-  event.preventDefault();
-  const file = event.dataTransfer.files[0];
-  const dt = new DataTransfer();
-  dt.items.add(file);
-  const input = document.getElementById("inputMIDIFile");
-  input.files = dt.files;
-  loadMIDIFromBlob(file);
-}
-
-function loadMIDIFileEvent(event) {
-  loadMIDIFromBlob(event.target.files[0]);
-}
-
-function loadMIDIUrlEvent(event) {
-  loadMIDIFromUrl(event.target.value);
-}
-
-async function loadMIDIFromUrlParams() {
-  const query = new URLSearchParams(location.search);
-  ns = await core.urlToNoteSequence(query.get("url"));
-  convert(ns, query);
-}
-
-async function loadMIDIFromBlob(file, query) {
-  ns = await core.blobToNoteSequence(file);
-  convert(ns, query);
-}
-
-async function loadMIDIFromUrl(midiUrl, query) {
-  ns = await core.urlToNoteSequence(midiUrl);
-  convert(ns, query);
-}
-
-function setMIDIInfo(query) {
-  if (query instanceof URLSearchParams) {
-    const title = query.get("title");
-    const composer = query.get("composer");
-    const maintainer = query.get("maintainer");
-    const web = query.get("web");
-    const license = query.get("license");
-    document.getElementById("midiTitle").textContent = title;
-    if (composer != maintainer) {
-      document.getElementById("composer").textContent = composer;
-    }
-    if (web) {
-      const a = document.createElement("a");
-      a.href = web;
-      a.textContent = maintainer;
-      document.getElementById("maintainer").replaceChildren(a);
-    } else {
-      document.getElementById("maintainer").textContent = maintainer;
-    }
-    try {
-      new URL(license);
-    } catch {
-      document.getElementById("license").textContent = license;
-    }
-  } else {
-    document.getElementById("midiTitle").textContent = "";
-    document.getElementById("composer").textContent = "";
-    document.getElementById("maintainer").textContent = "";
-    document.getElementById("license").textContent = "";
-  }
-}
-
-function convertGM(ns) {
-  ns.controlChanges = ns.controlChanges.filter((n) =>
-    n.controlNumber == 0 || n.controlNumber == 32
-  );
-}
-
-function convert(ns, query) {
-  convertGM(ns);
-
-  const waitTime = 3;
-  longestDuration = -Infinity;
-  ns.totalTime += waitTime;
-  ns.notes.forEach((note) => {
-    note.startTime += waitTime;
-    note.endTime += waitTime;
-    const duration = note.endTime - note.startTime;
-    if (longestDuration < duration) longestDuration = duration;
-  });
-  ns.controlChanges.forEach((cc) => {
-    cc.time += waitTime;
-  });
-  ns.tempos.slice(1).forEach((tempo) => {
-    tempo.time += waitTime;
-  });
-  ns.timeSignatures.slice(1).forEach((ts) => {
-    ts.time += waitTime;
-  });
-  ns.notes = ns.notes.sort((a, b) => {
-    if (a.startTime < b.startTime) return -1;
-    if (a.startTime > b.startTime) return 1;
-    return 0;
-  });
-  nsCache = core.sequences.clone(ns);
-  ns.notes.forEach((note) => {
-    note.velocity = 1;
-  });
-  setMIDIInfo(query);
-  initVisualizer();
-  setProgramsRadiobox();
-  initPlayer();
-}
-
-async function loadSoundFontFileEvent(event) {
-  if (player) {
-    document.getElementById("soundfonts").options[0].selected = true;
-    const file = event.target.files[0];
-    const soundFontBuffer = await file.arrayBuffer();
-    await player.loadSoundFontBuffer(soundFontBuffer);
-    await synthesizer.loadSoundFontBuffer(soundFontBuffer);
-  }
-}
-
-async function loadSoundFontUrlEvent(event) {
-  if (player) {
-    document.getElementById("soundfonts").options[0].selected = true;
-    const response = await fetch(event.target.value);
-    const soundFontBuffer = await response.arrayBuffer();
-    await player.loadSoundFontBuffer(soundFontBuffer);
-    await synthesizer.loadSoundFontBuffer(soundFontBuffer);
-  }
-}
-
-function styleToViewBox(svg) {
-  const style = svg.style;
-  const width = parseFloat(style.width);
-  const height = parseFloat(style.height);
-  const viewBox = `0 0 ${width} ${height}`;
-  svg.setAttribute("viewBox", viewBox);
-  svg.removeAttribute("style");
-}
-
-function searchNotePosition(notes, time) {
-  let left = 0;
-  let right = notes.length - 1;
-  if (time < notes[0].startTime) return -1;
-  while (left <= right) {
-    const mid = Math.floor((left + right) / 2);
-    if (notes[mid].startTime === time) {
-      const t = notes[mid].startTime - 1e-8;
-      if (t < notes[0].startTime) {
-        return 0;
-      } else {
-        return searchNotePosition(notes, t);
-      }
-    } else if (notes[mid].startTime < time) {
-      left = mid + 1;
-    } else {
-      right = mid - 1;
+function getGlobalCSS() {
+  let cssText = "";
+  for (const stylesheet of document.styleSheets) {
+    for (const rule of stylesheet.cssRules) {
+      cssText += rule.cssText;
     }
   }
-  return right;
+  const css = new CSSStyleSheet();
+  css.replaceSync(cssText);
+  return css;
 }
 
-const MIN_NOTE_LENGTH = 1;
-class WaterfallSVGVisualizer extends core.BaseSVGVisualizer {
-  // The default range is 21 < pitch <= 108, which only considers piano,
-  // however we need 9 < pitch <= 120 when considering all instruments.
-  NOTES_PER_OCTAVE = 12;
-  WHITE_NOTES_PER_OCTAVE = 7;
-  LOW_C = 12;
-  firstDrawnOctave = 0;
-  lastDrawnOctave = 8;
-
-  // svgPiano;
-  // config;
-
-  constructor(sequence, parentElement, config = {}) {
-    super(sequence, config);
-
-    if (!(parentElement instanceof HTMLDivElement)) {
-      throw new Error(
-        "This visualizer requires a <div> element to display the visualization",
+function defineShadowElement(tagName, callback) {
+  class ShadowElement extends HTMLElement {
+    constructor() {
+      super();
+      const shadow = this.attachShadow({ mode: "open" });
+      shadow.adoptedStyleSheets = [globalCSS];
+      shadow.appendChild(
+        document.getElementById(tagName).content.cloneNode(true),
       );
-    }
-
-    // Some sensible defaults.
-    this.config.whiteNoteWidth = config.whiteNoteWidth || 20;
-    this.config.blackNoteWidth = config.blackNoteWidth ||
-      this.config.whiteNoteWidth * 2 / 3;
-    this.config.whiteNoteHeight = config.whiteNoteHeight || 70;
-    this.config.blackNoteHeight = config.blackNoteHeight || (2 * 70 / 3);
-    this.config.showOnlyOctavesUsed = config.showOnlyOctavesUsed;
-
-    this.setupDOM(parentElement);
-
-    const size = this.getSize();
-    this.width = size.width;
-    this.height = size.height;
-
-    // Make sure that if we've used this svg element before, it's now emptied.
-    this.svg.style.width = `${this.width}px`;
-    this.svg.style.height = `${this.height}px`;
-
-    this.svgPiano.style.width = `${this.width}px`;
-    this.svgPiano.style.height = `${this.config.whiteNoteHeight}px`;
-
-    // Add a little bit of padding to the right, so that the scrollbar
-    // doesn't overlap the last note on the piano.
-    this.parentElement.style.width = `${
-      this.width + this.config.whiteNoteWidth
-    }px`;
-    this.parentElement.scrollTop = this.parentElement.scrollHeight;
-
-    this.clear();
-    this.drawPiano();
-    this.draw();
-  }
-
-  setupDOM(container) {
-    this.parentElement = document.createElement("div");
-    this.parentElement.classList.add("waterfall-notes-container");
-
-    const height = Math.max(container.getBoundingClientRect().height, 200);
-
-    // Height and padding-top must match for this to work.
-    this.parentElement.style.paddingTop = `${
-      height - this.config.whiteNoteHeight
-    }px`;
-    this.parentElement.style.height = `${
-      height - this.config.whiteNoteHeight
-    }px`;
-
-    this.parentElement.style.boxSizing = "border-box";
-    this.parentElement.style.overflowX = "hidden";
-    this.parentElement.style.overflowY = "auto";
-
-    this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    this.svgPiano = document.createElementNS(
-      "http://www.w3.org/2000/svg",
-      "svg",
-    );
-    this.svg.classList.add("waterfall-notes");
-    this.svgPiano.classList.add("waterfall-piano");
-
-    this.parentElement.appendChild(this.svg);
-    container.innerHTML = "";
-    container.appendChild(this.parentElement);
-    container.appendChild(this.svgPiano);
-  }
-  /**
-   * Redraws the entire note sequence if it hasn't been drawn before,
-   * optionally painting a note as active
-   * @param activeNote (Optional) If specified, this `Note` will be painted
-   * in the active color.
-   * @param scrollIntoView (Optional) If specified and the note being
-   * painted is offscreen, the parent container will be scrolled so that
-   * the note is in view.
-   * @returns The x position of the painted active note. Useful for
-   * automatically advancing the visualization if the note was painted
-   * outside of the screen.
-   */
-  // https://github.com/magenta/magenta-js/blob/master/music/src/core/visualizer.ts#L680
-  // support responsive
-  // improve performance
-  // TODO: long press of piano keys?
-  redraw(activeNote, startPos) {
-    if (!visualizer.drawn) visualizer.draw();
-    if (!activeNote) return;
-    this.clearActivePianoKeys();
-    const notes = visualizer.noteSequence.notes;
-    const rects = visualizer.svg.children;
-    const keys = [...visualizer.svgPiano.children].slice(1);
-    const startTime = activeNote.startTime;
-    if (!startPos) startPos = searchNotePosition(notes, startTime);
-    const endTarget = notes.slice(startPos);
-    let endPos = endTarget.findIndex((note) => startTime < note.startTime);
-    endPos = (endPos == -1) ? notes.length : startPos + endPos;
-    for (let i = startPos; i < endPos; i++) {
-      const note = notes[i];
-      visualizer.fillActiveRect(rects[i], note);
-      const pianoKeyPos = pianoKeyIndex.get(note.pitch);
-      visualizer.fillActiveRect(keys[pianoKeyPos], note);
+      callback?.(shadow, this);
     }
   }
-
-  getSize() {
-    this.updateMinMaxPitches(true);
-
-    let whiteNotesDrawn = 52; // For a full piano.
-    if (this.config.showOnlyOctavesUsed) {
-      // Go through each C note and see which is the one right below and
-      // above our sequence.
-      let foundFirst = false, foundLast = false;
-      for (let i = 1; i < 7; i++) {
-        const c = this.LOW_C + this.NOTES_PER_OCTAVE * i;
-        // Have we found the lowest pitch?
-        if (!foundFirst && c > this.config.minPitch) {
-          this.firstDrawnOctave = i - 1;
-          foundFirst = true;
-        }
-        // Have we found the highest pitch?
-        if (!foundLast && c > this.config.maxPitch) {
-          this.lastDrawnOctave = i - 1;
-          foundLast = true;
-        }
-      }
-
-      whiteNotesDrawn = (this.lastDrawnOctave - this.firstDrawnOctave + 1) *
-        this.WHITE_NOTES_PER_OCTAVE;
-    }
-
-    const width = whiteNotesDrawn * this.config.whiteNoteWidth;
-
-    // Calculate a nice width based on the length of the sequence we're
-    // playing.
-    // Warn if there's no totalTime or quantized steps set, since it leads
-    // to a bad size.
-    const endTime = this.noteSequence.totalTime;
-    if (!endTime) {
-      throw new Error(
-        "The sequence you are using with the visualizer does not have a " +
-          "totalQuantizedSteps or totalTime " +
-          "field set, so the visualizer can't be horizontally " +
-          "sized correctly.",
-      );
-    }
-
-    const height = Math.max(
-      endTime * this.config.pixelsPerTimeStep,
-      MIN_NOTE_LENGTH,
-    );
-    return { width, height };
-  }
-
-  getNotePosition(note, _noteIndex) {
-    const rect = this.svgPiano.querySelector(
-      `rect[data-pitch="${note.pitch}"]`,
-    );
-
-    if (!rect) {
-      return null;
-    }
-
-    // Size of this note.
-    const len = this.getNoteEndTime(note) - this.getNoteStartTime(note);
-    const x = Number(rect.getAttribute("x"));
-    const w = Number(rect.getAttribute("width"));
-    const h = Math.max(
-      this.config.pixelsPerTimeStep * len - this.config.noteSpacing,
-      MIN_NOTE_LENGTH,
-    );
-
-    // The svg' y=0 is at the top, but a smaller pitch is actually
-    // lower, so we're kind of painting backwards.
-    const y = this.height -
-      (this.getNoteStartTime(note) * this.config.pixelsPerTimeStep) - h;
-    return { x, y, w, h };
-  }
-
-  drawPiano() {
-    this.svgPiano.innerHTML = "";
-
-    const blackNoteOffset = this.config.whiteNoteWidth -
-      this.config.blackNoteWidth / 2;
-    const blackNoteIndexes = [1, 3, 6, 8, 10];
-
-    // Dear future reader: I am sure there is a better way to do this, but
-    // splitting it up makes it more readable and maintainable in case there's
-    // an off by one key error somewhere.
-    // Each note has an pitch. Pianos start on pitch 21 and end on 108.
-    // First draw all the white notes, in this order:
-    //    - if we're using all the octaves, pianos start on an A (so draw A,
-    //    B)
-    //    - ... the rest of the white keys per octave
-    //    - if we started on an A, we end on an extra C.
-    // Then draw all the black notes (so that these rects sit on top):
-    //    - if the piano started on an A, draw the A sharp
-    //    - ... the rest of the black keys per octave.
-
-    let x = 0;
-    let currentPitch = 0;
-    if (this.config.showOnlyOctavesUsed) {
-      // Starting on a C, and a bunch of octaves up.
-      currentPitch = (this.firstDrawnOctave * this.NOTES_PER_OCTAVE) +
-        this.LOW_C;
-    } else {
-      // Starting on the lowest A and B.
-      currentPitch = this.LOW_C - 3;
-      this.drawWhiteKey(currentPitch, x);
-      this.drawWhiteKey(currentPitch + 2, this.config.whiteNoteWidth);
-      currentPitch += 3;
-      x = 2 * this.config.whiteNoteWidth;
-    }
-
-    // Draw the rest of the white notes.
-    for (let o = this.firstDrawnOctave; o <= this.lastDrawnOctave; o++) {
-      for (let i = 0; i < this.NOTES_PER_OCTAVE; i++) {
-        // Black keys come later.
-        if (blackNoteIndexes.indexOf(i) === -1) {
-          this.drawWhiteKey(currentPitch, x);
-          x += this.config.whiteNoteWidth;
-        }
-        currentPitch++;
-      }
-    }
-
-    if (this.config.showOnlyOctavesUsed) {
-      // Starting on a C, and a bunch of octaves up.
-      currentPitch = (this.firstDrawnOctave * this.NOTES_PER_OCTAVE) +
-        this.LOW_C;
-      x = -this.config.whiteNoteWidth;
-    } else {
-      // Before we reset, add an extra C at the end because pianos.
-      this.drawWhiteKey(currentPitch, x);
-
-      // This piano started on an A, so draw the A sharp black key.
-      currentPitch = this.LOW_C - 3;
-      this.drawBlackKey(currentPitch + 1, blackNoteOffset);
-      currentPitch += 3; // Next one is the LOW_C.
-      x = this.config.whiteNoteWidth;
-    }
-
-    // Draw the rest of the black notes.
-    for (let o = this.firstDrawnOctave; o <= this.lastDrawnOctave; o++) {
-      for (let i = 0; i < this.NOTES_PER_OCTAVE; i++) {
-        if (blackNoteIndexes.indexOf(i) !== -1) {
-          this.drawBlackKey(currentPitch, x + blackNoteOffset);
-        } else {
-          x += this.config.whiteNoteWidth;
-        }
-        currentPitch++;
-      }
-    }
-  }
-
-  drawWhiteKey(index, x) {
-    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    rect.dataset.pitch = String(index);
-    rect.setAttribute("x", String(x));
-    rect.setAttribute("y", "0");
-    rect.setAttribute("width", String(this.config.whiteNoteWidth));
-    rect.setAttribute("height", String(this.config.whiteNoteHeight));
-    rect.setAttribute("fill", "white");
-    rect.setAttribute("original-fill", "white");
-    rect.setAttribute("stroke", "black");
-    rect.setAttribute("stroke-width", "3px");
-    rect.classList.add("white");
-    this.svgPiano.appendChild(rect);
-    return rect;
-  }
-
-  drawBlackKey(index, x) {
-    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    rect.dataset.pitch = String(index);
-    rect.setAttribute("x", String(x));
-    rect.setAttribute("y", "0");
-    rect.setAttribute("width", String(this.config.blackNoteWidth));
-    rect.setAttribute("height", String(this.config.blackNoteHeight));
-    rect.setAttribute("fill", "black");
-    rect.setAttribute("original-fill", "black");
-    rect.setAttribute("stroke", "black");
-    rect.setAttribute("stroke-width", "3px");
-    rect.classList.add("black");
-    this.svgPiano.appendChild(rect);
-    return rect;
-  }
-
-  getNoteFillColor(note, isActive) {
-    const opacityBaseline = 0.2; // Shift all the opacities up a little.
-    const opacity = note.velocity ? note.velocity / 100 + opacityBaseline : 1;
-    // const rgb = (isActive) ? this.config.activeNoteRGB : this.config.noteRGB;
-    const rgb = isActive ? this.config.activeNoteRGB : getRectColor();
-    const fill = `rgba(${rgb}, ${opacity})`;
-    return fill;
-  }
-
-  unfillActiveRect(svg) {
-    const els = svg.querySelectorAll("rect.active");
-    for (let i = 0; i < els.length; ++i) {
-      const el = els[i];
-      const fill = this.getNoteFillColor(nsCache.notes[i], false);
-      el.setAttribute("fill", fill);
-      el.classList.remove("active");
-    }
-  }
-  clearActiveNotes() {
-    this.unfillActiveRect(this.svg);
-    this.clearActivePianoKeys();
-    setRectOpacity();
-  }
-
-  clearActivePianoKeys() {
-    const els = this.svgPiano.querySelectorAll("rect.active");
-    for (let i = 0; i < els.length; ++i) {
-      const el = els[i];
-      el.setAttribute("fill", el.getAttribute("original-fill"));
-      el.classList.remove("active");
-    }
-  }
+  customElements.define(tagName, ShadowElement);
 }
 
-function initPianoKeyIndex() {
-  [...visualizer.svgPiano.children].forEach((rect, i) => {
-    const pitch = parseInt(rect.dataset.pitch);
-    pianoKeyIndex.set(pitch, i);
-  });
-}
-
-function getMinMaxPitch() {
-  let min = Infinity;
-  let max = -Infinity;
-  ns.notes.forEach((note) => {
-    if (note.pitch < min) min = note.pitch;
-    if (max < note.pitch) max = note.pitch;
-  });
-  return [min, max];
-}
-
-function beautifyPianoKey(rect) {
-  const className = rect.getAttribute("class");
-  const x = parseInt(rect.getAttribute("x"));
-  const y = rect.getAttribute("y");
-  const width = parseInt(rect.getAttribute("width"));
-  const height = parseInt(rect.getAttribute("height"));
-  const pitch = rect.getAttribute("data-pitch");
-  if (className == "white") {
-    return `
-<g>
-  <rect data-pitch="${pitch}"
-    x="${x}" y="${y}" width="${width}" height="${height}"
-    stroke="#666" stroke-width="1px" ry="3%" vector-effect="non-scaling-stroke"
-    original-fill="${className}" class="${className}" fill="url(#${className})">
-  </rect>
-  <rect data-pitch="${pitch}"
-    x="${x}" y="${y}" width="${width}" height="${height * 0.95}"
-    stroke="#666" stroke-width="1px" ry="3%" vector-effect="non-scaling-stroke"
-    original-fill="${className}" class="${className}" fill="url(#${className})">
-  </rect>
-</g>`;
-  } else {
-    return `
-<g>
-  <rect data-pitch="${pitch}"
-    x="${x}" y="${y}" width="${width}" height="${height}"
-    stroke="#666" stroke-width="1px" ry="2%" vector-effect="non-scaling-stroke"
-    original-fill="${className}" class="${className}" fill="url(#${className})">
-  </rect>
-  <rect data-pitch="${pitch}"
-    x="${x + width * 0.05}" y="${y}" width="${width * 0.9}" height="${
-      height * 0.85
-    }"
-    stroke="#666" stroke-width="1px" ry="2%" vector-effect="non-scaling-stroke"
-    original-fill="${className}" class="${className}" fill="url(#${className})">
-  </rect>
-</g>`;
-  }
-}
-
-function beautifyPiano(svg) {
-  let svgString = `
-<svg xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="black" gradientTransform="rotate(-20)">
-      <stop offset="0%" stop-color="#333"/>
-      <stop offset="50%" stop-color="#000"/>
-      <stop offset="100%" stop-color="#333"/>
-    </linearGradient>
-    <linearGradient id="white" gradientTransform="rotate(-30)">
-      <stop offset="0%" stop-color="#fff"/>
-      <stop offset="50%" stop-color="#f5f5f5"/>
-      <stop offset="100%" stop-color="#fff  "/>
-    </linearGradient>
-  </defs>
-  `;
-  [...svg.children].forEach((rect) => {
-    svgString += beautifyPianoKey(rect);
-  });
-  svgString += "</svg>";
-  const doc = new DOMParser().parseFromString(svgString, "image/svg+xml");
-  svg.replaceChildren(...doc.documentElement.children);
-}
-
-function initVisualizer() {
-  const playPanel = document.getElementById("playPanel");
-  const rect = playPanel.getBoundingClientRect();
-  const [minPitch, maxPitch] = getMinMaxPitch(ns);
-  const whiteNoteWidth = Math.round(
-    rect.width / (maxPitch - minPitch + 1) * 12 / 7,
-  );
-  const whiteNoteHeight = Math.round(whiteNoteWidth * 70 / 20);
-  const blackNoteHeight = Math.round(whiteNoteHeight * 2 / 3);
-  const config = {
-    showOnlyOctavesUsed: true,
-    whiteNoteWidth: whiteNoteWidth,
-    whiteNoteHeight: whiteNoteHeight,
-    blackNoteWidth: Math.round(whiteNoteWidth * 2 / 3),
-    blackNoteHeight: blackNoteHeight,
-    maxPitch: maxPitch,
-    minPitch: minPitch,
-    noteRGB: "0, 127, 255",
-  };
-  visualizer = new WaterfallSVGVisualizer(nsCache, playPanel, config);
-  initPianoKeyIndex();
-  styleToViewBox(visualizer.svg);
-  styleToViewBox(visualizer.svgPiano);
-  setRectColor();
-
-  const whiteCount = [...visualizer.svgPiano.children]
-    .filter((rect) => rect.getAttribute("class") == "white").length;
-  playPanel.style.width = whiteCount / 14 * 100 + "%";
-  beautifyPiano(visualizer.svgPiano);
-  visualizer.svgPiano.style.touchAction = "none";
-
-  const parentElement = visualizer.parentElement;
-  parentElement.style.width = "100%";
-  parentElement.style.height = "40vh";
-  parentElement.style.paddingTop = "40vh";
-  parentElement.style.overflowY = "hidden";
-  resize();
-}
-
-class MagentaPlayer extends core.SoundFontPlayer {
-  constructor(ns, runCallback, stopCallback) {
-    const soundFontUrl =
-      "https://storage.googleapis.com/magentadata/js/soundfonts/sgm_plus";
-    const callback = {
-      run: (note) => runCallback(note),
-      stop: () => stopCallback(),
-    };
-    super(soundFontUrl, undefined, undefined, undefined, callback);
-    this.ns = ns;
-    this.output.volume.value = 20 * Math.log(0.5) / Math.log(10);
-  }
-
-  loadSamples(ns) {
-    return super.loadSamples(ns).then(() => {
-      this.synth = true;
-    });
-  }
-
-  start(ns) {
-    return super.start(ns);
-  }
-
-  restart(seconds) {
-    if (seconds) {
-      return super.start(ns, undefined, seconds / ns.ticksPerQuarter);
-    } else {
-      return this.start(this.ns);
-    }
-  }
-
-  resume(seconds) {
-    super.resume();
-    this.seekTo(seconds);
-  }
-
-  changeVolume(volume) {
-    // 0 <= volume <= 100 --> 1e-5 <= dB <= 1 --> -100 <= slider <= 0
-    if (volume == 0) {
-      volume = -100;
-    } else {
-      volume = 20 * Math.log(volume / 100) / Math.log(10);
-    }
-    this.output.volume.value = volume;
-  }
-
-  changeMute(status) {
-    this.output.mute = status;
-  }
-}
-
-class SoundFontPlayer {
-  constructor(stopCallback) {
-    this.context = new globalThis.AudioContext();
-    this.state = "stopped";
-    this.noCallback = false;
-    this.stopCallback = stopCallback;
-    this.prevGain = 0.5;
-    this.cacheUrls = new Array(128);
-    this.totalTicks = 0;
-  }
-
-  async loadSoundFontDir(programs, dir) {
-    const promises = programs.map((program) => {
-      const programId = program.toString().padStart(3, "0");
-      const url = `${dir}/${programId}.sf3`;
-      if (this.cacheUrls[program] == url) return true;
-      this.cacheUrls[program] = url;
-      return this.fetchBuffer(url);
-    });
-    const buffers = await Promise.all(promises);
-    for (const buffer of buffers) {
-      if (buffer instanceof ArrayBuffer) {
-        await this.loadSoundFontBuffer(buffer);
-      }
-    }
-  }
-
-  async fetchBuffer(url) {
-    const response = await fetch(url);
-    if (response.status == 200) {
-      return await response.arrayBuffer();
-    } else {
-      return undefined;
-    }
-  }
-
-  async loadSoundFontUrl(url) {
-    const buffer = await this.fetchBuffer(url);
-    const soundFontId = await this.loadSoundFontBuffer(buffer);
-    return soundFontId;
-  }
-
-  async loadSoundFontBuffer(soundFontBuffer) {
-    if (!this.synth) {
-      await JSSynthPromise;
-      await this.context.audioWorklet.addModule(
-        "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/externals/libfluidsynth-2.3.0-with-libsndfile.min.js",
-      );
-      await this.context.audioWorklet.addModule(
-        "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/dist/js-synthesizer.worklet.min.js",
-      );
-      this.synth = new JSSynth.AudioWorkletNodeSynthesizer();
-      this.synth.init(this.context.sampleRate);
-      const node = this.synth.createAudioNode(this.context);
-      node.connect(this.context.destination);
-    }
-    const soundFontId = await this.synth.loadSFont(soundFontBuffer);
-    return soundFontId;
-  }
-
-  async loadNoteSequence(ns) {
-    await this.synth.resetPlayer();
-    this.ns = ns;
-    const midiBuffer = core.sequenceProtoToMidi(ns);
-    this.totalTicks = this.calcTick(ns.totalTime);
-    return this.synth.addSMFDataToPlayer(midiBuffer);
-  }
-
-  resumeContext() {
-    this.context.resume();
-  }
-
-  async restart(seconds) {
-    this.state = "started";
-    await this.synth.playPlayer();
-    if (seconds) this.seekTo(seconds);
-    await this.synth.waitForPlayerStopped();
-    await this.synth.waitForVoicesStopped();
-    this.state = "paused";
-    if (!this.noCallback) {
-      player.seekTo(0);
-      this.stopCallback();
-    }
-    this.noCallback = false;
-  }
-
-  async start(ns, _qpm, seconds) {
-    if (ns) await this.loadNoteSequence(ns);
-    if (seconds) this.seekTo(seconds);
-    this.restart();
-  }
-
-  stop(noCallback) {
-    if (noCallback) this.noCallback = true;
-    if (this.synth) this.synth.stopPlayer();
-  }
-
-  pause() {
-    this.state = "paused";
-    this.noCallback = true;
-    this.synth.stopPlayer();
-  }
-
-  resume(seconds) {
-    this.restart(seconds);
-  }
-
-  changeVolume(volume) {
-    // 0 <= volume <= 1
-    volume = volume / 100;
-    this.synth.setGain(volume);
-  }
-
-  changeMute(status) {
-    if (status) {
-      this.prevGain = this.synth.getGain();
-      this.synth.setGain(0);
-    } else {
-      this.synth.setGain(this.prevGain);
-    }
-  }
-
-  calcTick(seconds) {
-    let tick = 0;
-    let prevTime = 0;
-    let prevQpm = 120;
-    for (const tempo of this.ns.tempos) {
-      const currTime = tempo.time;
-      const currQpm = tempo.qpm;
-      if (currTime < seconds) {
-        const t = currTime - prevTime;
-        tick += prevQpm / 60 * t * this.ns.ticksPerQuarter;
-      } else {
-        const t = seconds - prevTime;
-        tick += prevQpm / 60 * t * this.ns.ticksPerQuarter;
-        return Math.round(tick);
-      }
-      prevTime = currTime;
-      prevQpm = currQpm;
-    }
-    const t = seconds - prevTime;
-    tick += prevQpm / 60 * t * this.ns.ticksPerQuarter;
-    return Math.floor(tick);
-  }
-
-  seekTo(seconds) {
-    const tick = this.calcTick(seconds);
-    this.synth.seekPlayer(tick);
-  }
-
-  isPlaying() {
-    if (!this.synth) return false;
-    return this.synth.isPlaying();
-  }
-
-  getPlayState() {
-    if (!this.synth) return "stopped";
-    if (this.synth.isPlaying()) return "started";
-    return this.state;
-  }
-}
-
-function stopCallback() {
-  clearInterval(timer);
-  currentTime = 0;
-  currentPos = 0;
-  initSeekbar(ns, 0);
-  visualizer.parentElement.scrollTop = visualizer.parentElement.scrollHeight;
-  clearPlayer();
-  const repeatObj = document.getElementById("repeat");
-  const repeat = repeatObj.classList.contains("active");
-  if (repeat) play();
-  scoring();
-  scoreModal.show();
-  [...visualizer.svg.getElementsByClassName("fade")].forEach((rect) => {
-    rect.classList.remove("fade");
-  });
-  visualizer.clearActiveNotes();
-}
-
-function noteOffByElement(g) {
-  const rects = g.children;
-  const pitch = parseInt(rects[1].getAttribute("data-pitch"));
-  const height = parseInt(rects[0].getAttribute("height"));
-
-  synthesizer.resumeContext();
-  synthesizer.synth.midiNoteOff(0, pitch);
-
-  countKeyPressOff(pitch);
-  const className = rects[0].getAttribute("class");
-  if (className == "white") {
-    rects[1].setAttribute("height", height * 0.95);
-  } else {
-    rects[1].setAttribute("height", height * 0.85);
-  }
-}
-
-async function initPianoEvent(name) {
-  synthesizer = new SoundFontPlayer(stopCallback);
-  await loadSoundFont(synthesizer, name);
-  initSynthesizerProgram();
-  const gs = [...visualizer.svgPiano.children];
-  gs.forEach((g) => {
-    const rects = g.children;
-    const pitch = parseInt(rects[1].getAttribute("data-pitch"));
-    const height = parseInt(rects[0].getAttribute("height"));
-    function noteOff() {
-      synthesizer.resumeContext();
-      synthesizer.synth.midiNoteOff(0, pitch);
-
-      countKeyPressOff(pitch);
-      const className = rects[0].getAttribute("class");
-      if (className == "white") {
-        rects[1].setAttribute("height", height * 0.95);
-      } else {
-        rects[1].setAttribute("height", height * 0.85);
-      }
-    }
-    function noteOn(event) {
-      synthesizer.resumeContext();
-      const pressure = event.pressure !== undefined
-        ? event.pressure
-        : event.force !== undefined
-        ? event.force
-        : 1;
-      const velocity = Math.ceil(pressure * 127);
-      synthesizer.synth.midiNoteOn(0, pitch, velocity);
-
-      countKeyPressOn(pitch);
-      rects[1].setAttribute("height", height * 0.975);
-    }
-    const touchCache = new Map();
-    g.addEventListener("touchmove", (event) => {
-      const touches = event.changedTouches;
-      for (let i = 0; i < touches.length; i++) {
-        const touch = touches[i];
-        const x = touch.clientX;
-        const y = touch.clientY;
-        const targetRect = document.elementsFromPoint(x, y)
-          .find((e) => e.tagName == "rect");
-        const prevTarget = touchCache.get(touch.identifier);
-        if (targetRect) {
-          const target = targetRect.parentNode;
-          if (prevTarget != target) {
-            touchCache.set(touch.identifier, target);
-            if (prevTarget) {
-              noteOffByElement(prevTarget);
-              target.dispatchEvent(new Event("touchstart"));
-            }
-          }
-        } else if (prevTarget) {
-          touchCache.delete(touch.identifier);
-          noteOffByElement(prevTarget);
-        }
-      }
-    });
-    g.addEventListener("touchstart", noteOn);
-    g.addEventListener("touchend", (event) => {
-      const touches = event.changedTouches;
-      for (let i = 0; i < touches.length; i++) {
-        const id = touches[i].identifier;
-        const target = touchCache.get(id);
-        if (target) {
-          noteOffByElement(target);
-          touchCache.delete(id);
-        } else {
-          noteOff();
-        }
-      }
-    });
-    g.addEventListener("mouseenter", (event) => {
-      if (mouseDowned) noteOn(event);
-    });
-    g.addEventListener("mousedown", noteOn);
-    g.addEventListener("mouseleave", noteOff);
-    g.addEventListener("mouseup", noteOff);
-  });
-  document.addEventListener("mouseup", () => {
-    mouseDowned = false;
-  });
-  document.addEventListener("mousedown", () => {
-    mouseDowned = true;
-  });
-}
-
-async function initPlayer() {
-  disableController();
-  if (player) player.stop(true);
-  clearPlayer();
-  currentTime = 0;
-  currentPos = 0;
-  initSeekbar(ns, 0);
-
-  // // Magenta.js
-  // const runCallback = (note) => visualizer.redraw(note);
-  // player = new MagentaPlayer(ns, runCallback, stopCallback);
-  // await player.loadSamples(ns);
-
-  // js-synthesizer
-  player = new SoundFontPlayer(stopCallback);
-  if (firstRun) {
-    firstRun = false;
-    await loadSoundFont(player, "GeneralUser_GS_v1.471");
-    await player.loadNoteSequence(ns);
-    await initPianoEvent("GeneralUser_GS_v1.471");
-  } else {
-    await loadSoundFont(player);
-    await player.loadNoteSequence(ns);
-    await initPianoEvent();
-  }
-
-  enableController();
-}
-
-function getPrograms(ns) {
-  const programs = new Set();
-  ns.notes.forEach((note) => programs.add(note.program));
-  if (ns.notes.some((note) => note.isDrum)) programs.add(128);
-  return [...programs];
-}
-
-async function loadSoundFont(player, name, programs) {
-  if (!name) {
-    const soundfonts = document.getElementById("soundfonts");
-    const index = soundfonts.selectedIndex;
-    if (index == 0) return; // use local file or url
-    name = soundfonts.options[index].value;
-  }
-  const soundFontDir = `https://soundfonts.pages.dev/${name}`;
-  if (!programs) programs = getPrograms(ns);
-  await player.loadSoundFontDir(programs, soundFontDir);
-}
-
-function checkNoteEvent() {
-  const notes = ns.notes;
-  if (notes.length <= currentPos) return;
-  const noteTime = notes[currentPos].startTime;
-  if (noteTime <= currentTime) {
-    let nextPos = currentPos + 1;
-    while (notes.length < nextPos && noteTime == notes[nextPos].startTime) {
-      nextPos += 1;
-    }
-    visualizer.redraw(notes[currentPos], currentPos);
-    currentPos = nextPos;
-  }
-}
-
-function setTimer(seconds) {
-  const delay = 1;
-  const startTime = Date.now() - seconds * 1000;
-  const totalTime = ns.totalTime;
-  clearInterval(timer);
-  timer = setInterval(() => {
-    const nextTime = (Date.now() - startTime) / 1000;
-    if (Math.floor(currentTime) != Math.floor(nextTime)) {
-      updateSeekbar(nextTime);
-    }
-    currentTime = nextTime;
-    if (currentTime < totalTime) {
-      const rate = 1 - currentTime / totalTime;
-      visualizer.parentElement.scrollTop = currentScrollHeight * rate;
-      if (player instanceof SoundFontPlayer) {
-        checkNoteEvent();
-      }
-    } else {
-      clearInterval(timer);
-    }
-  }, delay);
-}
-
-// fix delay caused by player.start(ns) by seeking after playing
-function setLoadingTimer(time) {
-  const loadingTimer = setInterval(() => {
-    if (player.isPlaying()) {
-      clearInterval(loadingTimer);
-      player.seekTo(time);
-      setTimer(time);
-      enableController();
-    }
-  }, 10);
-}
-
-function disableController() {
-  controllerDisabled = true;
-  const target = document.getElementById("controller")
-    .querySelectorAll("button, input");
-  [...target].forEach((node) => {
-    node.disabled = true;
-  });
-}
-
-function enableController() {
-  controllerDisabled = false;
-  const target = document.getElementById("controller")
-    .querySelectorAll("button, input");
-  [...target].forEach((node) => {
-    node.disabled = false;
-  });
-}
-
-function unlockAudio() {
-  if (!player) return;
-  if (!player.synth) return;
-  if (!synthesizer) return;
-  if (!synthesizer.synth) return;
-  player.resumeContext();
-  synthesizer.resumeContext();
-  document.removeEventListener("click", unlockAudio);
-}
-
-function play() {
-  tapCount = perfectCount = greatCount = 0;
-  disableController();
-  document.getElementById("play").classList.add("d-none");
-  document.getElementById("pause").classList.remove("d-none");
-  switch (player.getPlayState()) {
-    case "stopped":
-      initSeekbar(ns, currentTime);
-      setLoadingTimer(currentTime);
-      player.restart();
-      break;
-    case "started":
-    case "paused":
-      player.resume(currentTime);
-      setTimer(currentTime);
-      enableController();
-      break;
-  }
-  globalThis.scrollTo({
-    top: visualizer.svgPiano.getBoundingClientRect().top,
-    behavior: "auto",
-  });
-}
-
-function pause() {
-  player.pause();
-  clearPlayer();
-}
-
-function clearPlayer() {
-  clearInterval(timer);
-  document.getElementById("play").classList.remove("d-none");
-  document.getElementById("pause").classList.add("d-none");
-}
-
-function getRadioboxString(name, label) {
-  return `
-<div class="form-check form-check-inline">
-  <label class="form-check-label">
-    <input class="form-check-input" name="${name}" value="${label}" type="radio">
-    ${label}
-  </label>
-</div>`;
-}
-
-function getCheckboxString(name, label) {
-  return `
-<div class="form-check form-check-inline">
-  <label class="form-check-label">
-    <input class="form-check-input" name="${name}" value="${label}" type="checkbox" checked>
-    ${label}
-  </label>
-</div>`;
-}
-
-function setInstrumentsCheckbox(program) {
-  const set = new Set();
-  ns.notes.forEach((note) => {
-    if (note.program == program) set.add(note.instrument);
-  });
-  let str = "";
-  [...set].sort((a, b) => a - b).forEach((instrument) => {
-    str += getCheckboxString("instrument", instrument);
-  });
-  const doc = new DOMParser().parseFromString(str, "text/html");
-  const node = document.getElementById("filterInstruments");
-  node.replaceChildren(...doc.body.children);
-  [...node.querySelectorAll("input")].forEach((input) => {
-    input.addEventListener("change", changeInstrumentsCheckbox);
-  });
-}
-
-function setRectOpacity() {
-  const program = parseInt(
-    document.forms.filterPrograms.elements.program.value,
-  );
-  const inputs = document.getElementById("filterInstruments")
-    .querySelectorAll("input");
-  const states = new Map();
-  [...inputs].forEach((input) => {
-    states.set(parseInt(input.value), input.checked);
-  });
-  const rects = visualizer.svg.children;
-  ns.notes.forEach((note, i) => {
-    if (note.program != program) {
-      note.target = false;
-      note.velocity = nsCache.notes[i].velocity;
-      rects[i].setAttribute("opacity", 0.1);
-    } else if (states.get(note.instrument)) {
-      note.target = true;
-      note.velocity = 1;
-      rects[i].setAttribute("opacity", 1);
-    } else {
-      note.target = false;
-      note.velocity = nsCache.notes[i].velocity;
-      rects[i].setAttribute("opacity", 0.1);
-    }
-  });
-}
-
-async function changeInstrumentsCheckbox(event) {
-  const checked = event.target.checked;
-  const instrument = parseInt(event.target.value);
-  const rects = visualizer.svg.children;
-  ns.notes.forEach((note, i) => {
-    if (note.instrument == instrument) {
-      if (checked) {
-        note.target = true;
-        note.velocity = 1;
-        rects[i].setAttribute("opacity", 1);
-      } else {
-        note.target = false;
-        note.velocity = nsCache.notes[i].velocity;
-        rects[i].setAttribute("opacity", 0.1);
-      }
-    }
-  });
-  const seconds = currentTime;
-  const playState = player.getPlayState();
-  player.stop(true);
-  clearInterval(timer);
-  if (playState == "started") {
-    setLoadingTimer(seconds);
-    player.start(ns);
-  } else if (player instanceof SoundFontPlayer) {
-    await player.loadNoteSequence(ns);
-    player.seekTo(seconds);
-  }
-}
-
-function initSynthesizerProgram() {
-  const node = document.getElementById("filterPrograms");
-  const program = parseInt(node.querySelector("input").value);
-  synthesizer.synth.midiProgramChange(0, program);
-}
-
-function setProgramsRadiobox() {
-  const set = new Set();
-  ns.notes.forEach((note) => set.add(note.program));
-  let str = "";
-  [...set].sort().forEach((program) => {
-    str += getRadioboxString("program", program);
-  });
-  const doc = new DOMParser().parseFromString(str, "text/html");
-  const node = document.getElementById("filterPrograms");
-  node.replaceChildren(...doc.body.children);
-  [...node.querySelectorAll("input")].forEach((input, i) => {
-    input.addEventListener("change", changeProgramsRadiobox);
-    if (i == 0) {
-      input.checked = true;
-      input.dispatchEvent(new Event("change"));
-    }
-  });
-}
-
-function changeProgramsRadiobox(event) {
-  const program = parseInt(event.target.value);
-  if (synthesizer && synthesizer.synth) {
-    synthesizer.synth.midiProgramChange(0, program);
-  }
-  const rects = visualizer.svg.children;
-  ns.notes.forEach((note, i) => {
-    if (note.program == program) {
-      note.target = true;
-      note.velocity = 1;
-      rects[i].setAttribute("opacity", 1);
-    } else {
-      note.target = false;
-      note.velocity = nsCache.notes[i].velocity;
-      rects[i].setAttribute("opacity", 0.1);
-    }
-  });
-  setInstrumentsCheckbox(program);
-}
-
-function speedDown() {
-  if (player.isPlaying()) disableController();
-  const input = document.getElementById("speed");
-  const value = parseInt(input.value) - 10;
-  const speed = (value <= 0) ? 1 : value;
-  input.value = speed;
-  changeSpeed(speed);
-}
-
-function speedUp() {
-  if (player.isPlaying()) disableController();
-  const input = document.getElementById("speed");
-  const speed = parseInt(input.value) + 10;
-  input.value = speed;
-  changeSpeed(speed);
-}
-
-async function changeSpeed(speed) {
-  perfectCount = greatCount = 0;
-  if (!ns) return;
-  const playState = player.getPlayState();
-  player.stop(true);
-  clearInterval(timer);
-  const prevRate = nsCache.totalTime / ns.totalTime;
-  const rate = prevRate / (speed / 100);
-  const newSeconds = currentTime * rate;
-  setSpeed(ns, speed);
-  initSeekbar(ns, newSeconds);
-  if (playState == "started") {
-    setLoadingTimer(newSeconds);
-    player.start(ns);
-  } else if (player instanceof SoundFontPlayer) {
-    await player.loadNoteSequence(ns);
-    player.seekTo(newSeconds);
-  }
-}
-
-function changeSpeedEvent(event) {
-  if (player.isPlaying()) disableController();
-  const speed = parseInt(event.target.value);
-  changeSpeed(speed);
-}
-
-function setSpeed(ns, speed) {
-  if (speed <= 0) speed = 1;
-  speed /= 100;
-  const controlChanges = nsCache.controlChanges;
-  ns.controlChanges.forEach((n, i) => {
-    n.time = controlChanges[i].time / speed;
-  });
-  const tempos = nsCache.tempos;
-  ns.tempos.forEach((n, i) => {
-    n.time = tempos[i].time / speed;
-    n.qpm = tempos[i].qpm * speed;
-  });
-  const timeSignatures = nsCache.timeSignatures;
-  ns.timeSignatures.forEach((n, i) => {
-    n.time = timeSignatures[i].time / speed;
-  });
-  const notes = nsCache.notes;
-  ns.notes.forEach((n, i) => {
-    n.startTime = notes[i].startTime / speed;
-    n.endTime = notes[i].endTime / speed;
-  });
-  ns.totalTime = nsCache.totalTime / speed;
-}
-
-function repeat() {
-  document.getElementById("repeat").classList.toggle("active");
-}
-
-function volumeOnOff() {
-  const i = document.getElementById("volumeOnOff").firstElementChild;
-  const volumebar = document.getElementById("volumebar");
-  if (i.classList.contains("bi-volume-up-fill")) {
-    i.className = "bi bi-volume-mute-fill";
-    volumebar.dataset.value = volumebar.value;
-    volumebar.value = 0;
-    player.changeMute(true);
-  } else {
-    i.className = "bi bi-volume-up-fill";
-    volumebar.value = volumebar.dataset.value;
-    player.changeMute(false);
-  }
-}
-
-function changeVolumebar() {
-  const volumebar = document.getElementById("volumebar");
-  const volume = parseInt(volumebar.value);
-  volumebar.dataset.value = volume;
-  player.changeVolume(volume);
-}
-
-function formatTime(seconds) {
-  seconds = Math.floor(seconds);
-  const s = seconds % 60;
-  const m = (seconds - s) / 60;
-  const h = (seconds - s - 60 * m) / 3600;
-  const ss = String(s).padStart(2, "0");
-  const mm = (m > 9 || !h) ? `${m}:` : `0${m}:`;
-  const hh = h ? `${h}:` : "";
-  return `${hh}${mm}${ss}`;
-}
-
-function changeSeekbar(event) {
-  perfectCount = greatCount = 0;
-  clearInterval(timer);
-  [...visualizer.svg.getElementsByClassName("fade")].forEach((rect) => {
-    rect.classList.remove("fade");
-  });
-  visualizer.clearActiveNotes();
-  currentTime = parseInt(event.target.value);
-  if (currentTime == 0) {
-    currentPos = 0;
-  } else {
-    currentPos = searchNotePosition(ns.notes, currentTime);
-  }
-  document.getElementById("currentTime").textContent = formatTime(currentTime);
-  seekScroll(currentTime);
-  if (player.getPlayState() == "started") {
-    player.seekTo(currentTime);
-    setTimer(currentTime);
-  }
-}
-
-function updateSeekbar(seconds) {
-  const seekbar = document.getElementById("seekbar");
-  seekbar.value = seconds;
-  const time = formatTime(seconds);
-  document.getElementById("currentTime").textContent = time;
-}
-
-function initSeekbar(ns, seconds) {
-  document.getElementById("seekbar").max = ns.totalTime;
-  document.getElementById("seekbar").value = seconds;
-  document.getElementById("totalTime").textContent = formatTime(ns.totalTime);
-  document.getElementById("currentTime").textContent = formatTime(seconds);
-}
-
-function loadSoundFontList() {
-  return fetch("https://soundfonts.pages.dev/list.json")
-    .then((response) => response.json())
-    .then((data) => {
-      const soundfonts = document.getElementById("soundfonts");
-      data.forEach((info) => {
-        const option = document.createElement("option");
-        option.textContent = info.name;
-        if (info.name == "GeneralUser_GS_v1.471") {
-          option.selected = true;
-        }
-        soundfonts.appendChild(option);
-      });
-    });
-}
-
-async function changeConfig() {
-  switch (player.getPlayState()) {
-    case "started": {
-      player.stop(true);
-      if (player instanceof SoundFontPlayer) {
-        await loadSoundFont(player);
-        await player.loadNoteSequence(ns);
-        await loadSoundFont(synthesizer);
-      }
-      const speed = parseInt(document.getElementById("speed").value);
-      setSpeed(ns, speed);
-      const seconds = parseInt(document.getElementById("seekbar").value);
-      initSeekbar(ns, seconds);
-      setLoadingTimer(seconds);
-      player.start(ns);
-      break;
-    }
-    case "paused":
-      configChanged = true;
-      break;
-  }
-}
-
-function resize() {
-  const parentElement = visualizer.parentElement;
-  const rectHeight = parentElement.getBoundingClientRect().height;
-  currentScrollHeight = parentElement.scrollHeight - rectHeight;
-  seekScroll(currentTime);
-}
-
-function seekScroll(time) {
-  const rate = (ns.totalTime - time) / ns.totalTime;
-  visualizer.parentElement.scrollTop = currentScrollHeight * rate;
-}
-
-function typeEvent(event) {
-  if (!player || !player.synth) return;
-  if (controllerDisabled) return;
-  player.resumeContext();
-  switch (event.code) {
-    case "Space":
-      event.preventDefault();
-      if (player.getPlayState() == "started") {
-        pause();
-      } else {
-        play();
-      }
-      break;
-  }
-}
-
-function countKeyPressOn(pitch) {
-  const t = currentTime;
-  const looseTime = 0.1;
-  const startTime = t - longestDuration;
-  const endTime = t + looseTime;
-  let startPos = searchNotePosition(ns.notes, startTime);
-  if (startPos < 0) startPos = 0;
-  const endPos = searchNotePosition(ns.notes, endTime);
-  const matched = ns.notes
-    .slice(startPos, endPos + 1)
-    .filter((note) => {
-      if (!note.target) return false;
-      if (note.pitch != pitch) return false;
-      return true;
-    });
-  if (matched.length > 0) {
-    matched.slice(-1).forEach((note) => {
-      note.pressed = t;
-      tapCount += 1;
-    });
-  } else {
-    tapCount += 1;
-  }
-}
-
-function countKeyPressOff(pitch) {
-  const t = currentTime;
-  const startTime = t - longestDuration;
-  let startPos = searchNotePosition(ns.notes, startTime);
-  if (startPos < 0) startPos = 0;
-  const endPos = searchNotePosition(ns.notes, t);
-  const indexes = [];
-  for (let i = startPos; i <= endPos; i++) {
-    const note = ns.notes[i];
-    if (!note.target) continue;
-    if (note.pitch != pitch) continue;
-    if (!note.pressed) continue;
-    indexes.push(i);
-  }
-  indexes.forEach((index) => {
-    const note = ns.notes[index];
-    const rate = (t - note.pressed) / (note.endTime - note.startTime);
-    note.pressed = false;
-    if (rate > 0.5) {
-      perfectCount += 1;
-    } else {
-      greatCount += 1;
-    }
-  });
-}
-
-function getAccuracy() {
-  if (tapCount == 0) return 0;
-  return (perfectCount + greatCount) / tapCount;
-}
-
-function scoring() {
-  const accuracy = getAccuracy();
-  const missCount = tapCount - perfectCount - greatCount;
-  const perfectRate = Math.ceil(perfectCount / tapCount * 10000) / 100;
-  const greatRate = Math.ceil(greatCount / tapCount * 10000) / 100;
-  const missRate = Math.ceil(missCount / tapCount * 10000) / 100;
-  const tapped = perfectCount * 2 + greatCount;
-  const speed = parseInt(document.getElementById("speed").value);
-  const score = parseInt(tapped * speed * accuracy);
-  document.getElementById("perfectCount").textContent = perfectCount;
-  document.getElementById("greatCount").textContent = greatCount;
-  document.getElementById("missCount").textContent = missCount;
-  document.getElementById("perfectRate").textContent = perfectRate + "%";
-  document.getElementById("greatRate").textContent = greatRate + "%";
-  document.getElementById("missRate").textContent = missRate + "%";
-  document.getElementById("score").textContent = score;
-  const title = document.getElementById("midiTitle").textContent;
-  const composer = document.getElementById("composer").textContent;
-  const info = `${title} ${composer}`;
-  const text = encodeURIComponent(`Doremi Piano! ${info}: ${score}`);
-  const url = "https://marmooo.github.com/doremi-piano/";
-  const twitterUrl =
-    `https://twitter.com/intent/tweet?text=${text}&url=${url}&hashtags=DoremiPiano`;
-  document.getElementById("twitter").href = twitterUrl;
-}
-
-function initQuery() {
-  const query = new URLSearchParams();
-  query.set("title", "When the Swallows Homeward Fly (Agathe)");
-  query.set("composer", "Franz Wilhelm Abt");
-  query.set("maintainer", "Stan Sanderson");
-  query.set("license", "Public Domain");
-  return query;
-}
-
-function changeInstrument(event) {
-  if (!synthesizer) return;
-  if (!synthesizer.synth) return;
-  const instrument = event.target.selectedIndex - 1;
-  if (instrument < 0) {
-    const node = document.getElementById("filterPrograms");
-    const program = parseInt(node.querySelector("input").value);
-    synthesizer.synth.midiProgramChange(0, program);
-  } else {
-    loadSoundFont(synthesizer, undefined, [instrument]);
-    synthesizer.synth.midiProgramChange(0, instrument);
-  }
-}
-
-async function loadInstrumentList() {
-  const response = await fetch(`instruments.lst`);
-  const text = await response.text();
-  const instruments = document.getElementById("instruments");
-  text.trimEnd().split("\n").forEach((line) => {
-    const option = document.createElement("option");
-    option.textContent = line;
-    instruments.appendChild(option);
-  });
-}
-
-function loadLibraries(urls) {
-  const promises = urls.map((url) => {
-    return new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = url;
-      script.async = true;
-      script.onload = resolve;
-      script.onerror = reject;
-      document.body.appendChild(script);
-    });
-  });
-  return Promise.all(promises);
-}
-
-const pianoKeyIndex = new Map();
-let controllerDisabled;
-let colorful = true;
-let currentTime = 0;
-let currentPos = 0;
-let currentScrollHeight;
-let ns;
-let nsCache;
-let timer;
-let player;
-let visualizer;
-let synthesizer;
-let tapCount = 0;
-let perfectCount = 0;
-let greatCount = 0;
-let firstRun = true;
-let mouseDowned = false;
-
-if (location.search) {
-  loadMIDIFromUrlParams();
-} else {
-  const query = initQuery();
-  loadMIDIFromUrl("abt.mid", query);
-}
-loadSoundFontList();
-loadInstrumentList();
-
-const scoreModal = new bootstrap.Modal("#scorePanel", {
-  backdrop: "static",
-  keyboard: false,
+const globalCSS = getGlobalCSS();
+defineShadowElement("midi-instrument", (shadow) => {
+  shadow.querySelector("select").onchange = setProgramChange;
+});
+defineShadowElement("midi-drum", (shadow) => {
+  shadow.querySelector("select").onchange = setProgramChange;
 });
 
-Module = {};
-const JSSynthPromise = loadLibraries([
-  "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/dist/js-synthesizer.min.js",
-  "https://cdn.jsdelivr.net/npm/js-synthesizer@1.8.5/externals/libfluidsynth-2.3.0-with-libsndfile.min.js",
+function setEffect(groupId, channel, value) {
+  if (effectTypes[groupId] === "expression") {
+    midy.setControlChange(channel, 11, value);
+  } else {
+    midy.setControlChange(channel, 74, value);
+  }
+}
+
+async function setProgramChange(event) {
+  const target = event.target;
+  const host = target.getRootNode().host;
+  const programNumber = target.selectedIndex;
+  const channelNumber = (host.id === "instrument-first") ? 0 : 15;
+  const channel = midy.channels[channelNumber];
+  const bankNumber = channel.isDrum ? 128 : channel.bankLSB;
+  const index = midy.soundFontTable[programNumber][bankNumber];
+  if (index === undefined) {
+    const program = programNumber.toString().padStart(3, "0");
+    const baseName = bankNumber === 128 ? "128" : program;
+    const path = `${soundFontURL}/${baseName}.sf3`;
+    await midy.loadSoundFont(path);
+  }
+  midy.setProgramChange(channelNumber, programNumber);
+}
+
+function getPointerArea(event) {
+  return event.width * event.height;
+}
+
+// A touch that lands within this fraction of a key's own width/depth from a
+// boundary is also treated as touching the neighboring key — this is what
+// lets one finger straddling a boundary sound both notes at once. It's a
+// percentage of the key's own size (in SVG user units, see below), not a
+// fixed pixel count, so it stays proportionally correct no matter how the
+// keyboard is currently scaled on screen.
+const BOUNDARY_TOLERANCE_RATIO = 0.08;
+
+// Finds which keyboard group (svg + its key data) a screen point falls
+// inside of. There can be more than one keyboard on screen (portrait mode
+// stacks two), so this picks the right one before doing any key math.
+function findGroupAt(clientX, clientY) {
+  for (const group of keyboardGroups) {
+    const r = group.svg.getBoundingClientRect();
+    if (
+      clientX >= r.left && clientX <= r.right &&
+      clientY >= r.top && clientY <= r.bottom
+    ) {
+      return group;
+    }
+  }
+  return null;
+}
+
+// Converts a screen point into the SVG's own user-space coordinates (the
+// same 0..VIEW_W / 0..VIEW_H space the key geometry is defined in), using
+// the SVG's actual current transform. This does the coordinate math
+// ourselves instead of asking the browser "which element is at this
+// screen point": on some devices/renderers, hit-testing inside a scaled
+// (viewBox) SVG can be unreliable — off by a significant fraction of a key
+// — while the transform matrix itself (and therefore this calculation)
+// stays exact regardless of how the SVG is currently scaled or rendered.
+function clientToSvgPoint(svg, clientX, clientY) {
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return null;
+  const pt = svg.createSVGPoint();
+  pt.x = clientX;
+  pt.y = clientY;
+  const p = pt.matrixTransform(ctm.inverse());
+  return { x: p.x, y: p.y };
+}
+
+// Finds every key entry in a group whose own geometry contains (x, y), in
+// SVG user-space units, expanded by `tol` (also in user-space units) on
+// each side, restricted to a single `type` ("white" or "black").
+function keysOfTypeContaining(group, type, x, y, tol) {
+  return group.keyEls.filter(({ data }) => {
+    if (data.type !== type) return false;
+    if (type === "black") {
+      return y <= BK_V + tol &&
+        x >= data.pos - tol && x <= data.pos + data.span + tol;
+    }
+    return x >= data.pos - tol && x <= data.pos + data.span + tol;
+  });
+}
+
+// Resolves the single key exactly under (x, y), with no tolerance. Black
+// keys are checked first: a black key's footprint and the white key
+// directly behind it can never both be "the key you meant" for the same
+// point, so if a black key exactly contains the point, that's the answer.
+function keyExactlyAt(group, x, y) {
+  const blacks = keysOfTypeContaining(group, "black", x, y, 0);
+  if (blacks.length > 0) return blacks[0];
+  const whites = keysOfTypeContaining(group, "white", x, y, 0);
+  return whites[0] ?? null;
+}
+
+// Finds the white key touching a given black key's LEFT edge and/or its
+// RIGHT edge — but only the side(s) the point (x) is actually close to,
+// within `tol`. A black key's own span overlaps 0.3 units into each
+// flanking white key's full logical span (the visual notch is cosmetic;
+// the underlying position data is not narrowed), so "the white key at
+// this edge" is simply whichever white key's span contains that edge
+// x-coordinate.
+function flankingWhitesNearEdge(group, blackData, x, tol) {
+  const blackStart = blackData.pos;
+  const blackEnd = blackData.pos + blackData.span;
+  const results = [];
+  if (x - blackStart <= tol) {
+    const left = group.keyEls.find(({ data }) =>
+      data.type === "white" && blackStart >= data.pos &&
+      blackStart <= data.pos + data.span
+    );
+    if (left) results.push(left);
+  }
+  if (blackEnd - x <= tol) {
+    const right = group.keyEls.find(({ data }) =>
+      data.type === "white" && blackEnd >= data.pos &&
+      blackEnd <= data.pos + data.span
+    );
+    if (right) results.push(right);
+  }
+  return results;
+}
+
+// How far (in the same SVG user-space units as key positions) a press has
+// to be from a black key's edge to also count as touching the white key on
+// that side, at a given depth `y` into the key (0 = the far/back edge near
+// y=0, 1 = the near/front tip at y=BK_V). For most of the key's depth (up
+// to FRONT_ZONE_START) this stays exactly BOUNDARY_TOLERANCE_RATIO — the
+// same small edge tolerance used everywhere else — so the black key has a
+// wide, comfortable "just this note" zone the whole way from the back
+// down to near the front, not just a thin sliver. Only inside the last
+// stretch near the very front tip does it widen further, enough that a
+// roughly-centered press right at the tip can be "close enough" to BOTH
+// edges simultaneously — that's the deliberate, narrow white-black-white
+// 3-key spot. BOUNDARY_TOLERANCE_RATIO alone (0.08) is less than half a
+// black key's own width (0.6), so the two edge zones can never meet on
+// their own; this front-only widening is what makes the 3-key chord
+// reachable at all, without shrinking the solo zone everywhere else.
+const FRONT_ZONE_START = 0.95; // fraction of depth where widening begins
+const BLACK_FRONT_TOL_RATIO = 0.75; // fraction of the black key's own span, reached at the very tip
+
+function blackEdgeTolerance(blackData, y) {
+  const depth = Math.min(Math.max(y / BK_V, 0), 1);
+  if (depth <= FRONT_ZONE_START) return BOUNDARY_TOLERANCE_RATIO;
+  const localDepth = (depth - FRONT_ZONE_START) / (1 - FRONT_ZONE_START);
+  const frontTol = blackData.span * BLACK_FRONT_TOL_RATIO;
+  return BOUNDARY_TOLERANCE_RATIO +
+    (frontTol - BOUNDARY_TOLERANCE_RATIO) * localDepth;
+}
+
+// Resolves which key(s) a pointer event is touching, purely from geometry:
+// find the right keyboard, convert the touch point into that keyboard's
+// own coordinate space, and test it against each key's actual bounds. No
+// step of this depends on the browser's own point-to-element hit-testing.
+// The exact touch point first resolves a single, unambiguous primary key;
+// widening by BOUNDARY_TOLERANCE_RATIO then looks for MORE keys of that
+// SAME type (adjacent white keys, or — in principle — adjacent black
+// keys), never the other type, so a precise press on a white key can never
+// have its result silently swapped out by a black key that merely happens
+// to be nearby. A black key additionally checks its flanking white keys
+// using a tolerance that widens toward the front tip (see
+// blackEdgeTolerance) — pressing near the back of a black key behaves like
+// any other precise press (black alone, or +1 white right at an edge);
+// only pressing low enough, and roughly centered, can reach both flanking
+// white keys at once for the full white-black-white chord.
+function getPadHits(event) {
+  const group = findGroupAt(event.clientX, event.clientY);
+  if (!group) return [];
+  const p = clientToSvgPoint(group.svg, event.clientX, event.clientY);
+  if (!p) return [];
+  const primary = keyExactlyAt(group, p.x, p.y);
+  if (!primary) return [];
+  const widened = keysOfTypeContaining(
+    group,
+    primary.data.type,
+    p.x,
+    p.y,
+    BOUNDARY_TOLERANCE_RATIO,
+  );
+  if (primary.data.type === "black") {
+    const tol = blackEdgeTolerance(primary.data, p.y);
+    const edgeWhites = flankingWhitesNearEdge(group, primary.data, p.x, tol);
+    for (const white of edgeWhites) {
+      if (!widened.includes(white)) widened.push(white);
+    }
+  }
+  return widened.map((entry) => entry.el);
+}
+
+function setPadColor(padHit, velocity) {
+  const visual = document.getElementById(padHit.dataset.visual);
+  if (!visual) return null;
+  if (velocity != null) {
+    const lightness = 30 + (velocity / 127) * 40;
+    visual.style.fill = `hsl(200, 80%, ${lightness}%)`;
+  } else {
+    visual.style.fill = "";
+  }
+  return visual;
+}
+
+function highlightPad(padHit, velocity = 64) {
+  setPadColor(padHit, velocity);
+}
+
+function clearPadColor(padHit) {
+  setPadColor(padHit, null);
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function toMidiValue(ratio) {
+  return Math.max(1, Math.round(ratio * 127));
+}
+
+function getHitsOrientation(hits) {
+  const rects = hits.map((h) => h.getBoundingClientRect());
+  const left = Math.min(...rects.map((r) => r.left));
+  const right = Math.max(...rects.map((r) => r.right));
+  const top = Math.min(...rects.map((r) => r.top));
+  const bottom = Math.max(...rects.map((r) => r.bottom));
+  return (right - left) > (bottom - top) ? "horizontal" : "vertical";
+}
+
+function calcPitchBendRatio(event, padRect) {
+  const inset = padRect.width * 0.1;
+  const { clientX: x, clientY: y } = event;
+  if (x < padRect.left) {
+    return {
+      ratio: clamp(1 + (x - padRect.left) / inset, 0, 1),
+      direction: "horizontal",
+    };
+  }
+  if (x > padRect.right) {
+    return {
+      ratio: clamp(1 + (padRect.right - x) / inset, 0, 1),
+      direction: "horizontal",
+    };
+  }
+  if (y < padRect.top) {
+    return {
+      ratio: clamp(1 + (y - padRect.top) / inset, 0, 1),
+      direction: "vertical",
+    };
+  }
+  if (y > padRect.bottom) {
+    return {
+      ratio: clamp(1 + (padRect.bottom - y) / inset, 0, 1),
+      direction: "vertical",
+    };
+  }
+  return null; // inside pad
+}
+
+function calcContinuousPitchBend(event, state) {
+  const semitoneDiff = state.toNote - state.fromNote;
+  let ratio = 1;
+  if (state.targetPadHit && state.currentPadHit) {
+    const fromRect = state.currentPadHit.getBoundingClientRect();
+    const toRect = state.targetPadHit.getBoundingClientRect();
+    const { clientX: x, clientY: y } = event;
+    if (state.bendDirection === "horizontal") {
+      const left = Math.max(fromRect.left, toRect.left);
+      const right = Math.min(fromRect.right, toRect.right);
+      ratio = clamp((x - left) / (right - left), 0, 1);
+    } else {
+      const top = Math.max(fromRect.top, toRect.top);
+      const bottom = Math.min(fromRect.bottom, toRect.bottom);
+      ratio = clamp((y - top) / (bottom - top), 0, 1);
+    }
+  } else if (state.currentPadHit) {
+    const padRect = state.currentPadHit.getBoundingClientRect();
+    const result = calcPitchBendRatio(event, padRect);
+    if (result) {
+      ratio = result.ratio;
+      state.bendDirection ??= result.direction;
+    }
+  } else {
+    state.bendDirection = null;
+  }
+  const sensitivity =
+    midy.channels[state.channelNumber].state.pitchWheelSensitivity *
+    128 * 2;
+  return Math.round(8192 + (8192 * semitoneDiff * ratio) / sensitivity);
+}
+
+function calcExpressionFromMovement(event, state) {
+  if (!state.currentPadHit || !state.bendDirection) return null;
+  const padRect = state.currentPadHit.parentNode.getBoundingClientRect();
+  const ratio = state.bendDirection === "horizontal"
+    ? 1 - clamp(event.clientY - padRect.top, 0, padRect.height) / padRect.height
+    : clamp(event.clientX - padRect.left, 0, padRect.width) / padRect.width;
+  return toMidiValue(ratio);
+}
+
+function calcVelocityFromY(event, padHit) {
+  const rect = padHit.getBoundingClientRect();
+  const y = event.clientY - rect.top;
+  const ratio = 1 - clamp(y / rect.height, 0, 1);
+  return toMidiValue(ratio);
+}
+
+function calcInitialChordExpression(event, hits) {
+  const rects = hits.map((h) => h.getBoundingClientRect());
+  const left = Math.min(...rects.map((r) => r.left));
+  const right = Math.max(...rects.map((r) => r.right));
+  const ratio = clamp((event.clientX - left) / (right - left), 0, 1);
+  return Math.round(ratio * 127);
+}
+
+function allocChannel(groupId) {
+  if (groupId === 0) return lowerFreeChannels.shift() ?? null;
+  if (groupId === 1) return upperFreeChannels.shift() ?? null;
+  return null;
+}
+
+function releaseChannel(channelNumber) {
+  if (1 <= channelNumber && channelNumber <= midy.lowerMPEMembers) {
+    lowerFreeChannels.push(channelNumber);
+  } else if (
+    15 - midy.upperMPEMembers <= channelNumber && channelNumber <= 14
+  ) {
+    upperFreeChannels.push(channelNumber);
+  }
+}
+
+function createMPEPointerState(channelNumber, groupId) {
+  return {
+    groupId,
+    channelNumber,
+    baseNotes: new Set(),
+    padHits: new Set(),
+    baseCenterNote: null,
+    chordExpression: 64,
+    initialOrientation: null,
+    currentPadHit: null,
+    targetPadHit: null,
+    fromNote: null,
+    toNote: null,
+    bendDirection: null,
+    // aftertouch
+    baseArea: 1,
+    pressure: 0,
+    pressureDirection: 0,
+    pressureInterval: null,
+    lastMoveTime: 0,
+  };
+}
+
+function getOrCreateState(pointerId, groupId) {
+  if (!mpePointers.has(pointerId)) {
+    const channelNumber = allocChannel(groupId);
+    if (channelNumber == null) return null;
+    mpePointers.set(pointerId, createMPEPointerState(channelNumber, groupId));
+  }
+  return mpePointers.get(pointerId);
+}
+
+function handlePointerDown(event, groupId) {
+  if (!isInsidePanel(event)) return;
+  panel.setPointerCapture(event.pointerId);
+  if (mpePointers.has(event.pointerId)) {
+    handlePointerUp(event);
+  }
+  const hits = getPadHits(event);
+  if (hits.length === 0 || hits.length > 3) return;
+  const state = getOrCreateState(event.pointerId, groupId);
+  if (!state) return;
+  if (hits.length >= 2) {
+    state.initialOrientation = getHitsOrientation(hits);
+    if (state.initialOrientation === "vertical") {
+      state.chordExpression = calcInitialChordExpression(event, hits);
+      setEffect(groupId, state.channelNumber, state.chordExpression);
+    }
+  }
+  for (const padHit of hits) {
+    activatePad(event, padHit, state);
+  }
+  mpeHitMap.set(event.pointerId, new Set(hits));
+}
+
+function activatePad(event, padHit, state) {
+  const note = Number(padHit.dataset.index);
+  if (state.baseNotes.has(note)) return;
+  if (state.baseNotes.size === 0) {
+    if (state.initialOrientation !== "vertical") {
+      state.chordExpression = calcVelocityFromY(event, padHit);
+    }
+    setEffect(state.groupId, state.channelNumber, state.chordExpression);
+    if (afterTouchEnabled) {
+      state.baseArea = getPointerArea(event);
+      state.pressure = 0;
+      state.pressureDirection = 0;
+      midy.setChannelPressure(state.channelNumber, 0);
+      state.pressureInterval = setInterval(() => {
+        const next = clamp(state.pressure + state.pressureDirection, 0, 127);
+        if (next === state.pressure) return;
+        state.pressure = next;
+        midy.setChannelPressure(state.channelNumber, state.pressure);
+      }, 0);
+    }
+  }
+  highlightPad(padHit, state.chordExpression);
+  if (state.baseCenterNote == null) {
+    state.baseCenterNote = note;
+    if (bendEnabled[state.groupId]) {
+      midy.channels[state.channelNumber].setPitchBendRange(8192);
+    }
+  }
+  midy.noteOn(state.channelNumber, note, 127);
+  state.baseNotes.add(note);
+  state.padHits.add(padHit);
+  state.currentPadHit = padHit;
+  state.fromNote = state.baseCenterNote ?? note;
+  state.toNote = note;
+}
+
+// Piano keys normally don't pitch-bend: while dragging, just noteOff keys
+// no longer touched and noteOn any newly touched ones (glissando-style),
+// instead of bending pitch continuously between two notes.
+function syncNoteOnMove(event, state, hits) {
+  const hitMap = new Map(hits.map((h) => [Number(h.dataset.index), h]));
+  for (const note of [...state.baseNotes]) {
+    if (!hitMap.has(note)) {
+      midy.noteOff(state.channelNumber, note);
+      state.baseNotes.delete(note);
+    }
+  }
+  for (const [note] of hitMap) {
+    if (!state.baseNotes.has(note)) {
+      midy.noteOn(state.channelNumber, note, 127);
+      state.baseNotes.add(note);
+    }
+  }
+  state.currentPadHit = hits[0] ?? state.currentPadHit;
+  state.bendDirection = state.baseNotes.size > 1
+    ? state.initialOrientation
+    : "horizontal"; // keeps the vertical axis driving expression
+  const expression = calcExpressionFromMovement(event, state);
+  const vel = expression ?? state.chordExpression;
+  if (expression !== null) {
+    state.chordExpression = expression;
+    setEffect(state.groupId, state.channelNumber, expression);
+  }
+  hits.forEach((p) => highlightPad(p, vel));
+}
+
+function handlePointerMove(event) {
+  const state = mpePointers.get(event.pointerId);
+  if (!state) return;
+  if (afterTouchEnabled) {
+    const now = event.timeStamp;
+    state.lastMoveTime = now;
+    const area = getPointerArea(event);
+    state.pressureDirection = state.baseArea < area ? 1 : -1;
+  }
+  const hits = getPadHits(event);
+  const newHitSet = new Set(hits);
+  for (const padHit of state.padHits) {
+    if (!newHitSet.has(padHit)) clearPadColor(padHit);
+  }
+  state.padHits = newHitSet;
+  mpeHitMap.set(event.pointerId, newHitSet);
+  if (!bendEnabled[state.groupId]) {
+    syncNoteOnMove(event, state, hits);
+    return;
+  }
+  if (hits.length === 2 && state.baseNotes.size === 1) {
+    const padA = hits.find((p) => Number(p.dataset.index) === state.fromNote);
+    const padB = hits.find((p) => Number(p.dataset.index) !== state.fromNote);
+    if (padA && padB) {
+      state.currentPadHit = padA;
+      state.targetPadHit = padB;
+      state.toNote = Number(padB.dataset.index);
+      state.bendDirection = getHitsOrientation([padA, padB]);
+    }
+  } else if (hits.length === 1) {
+    const note = Number(hits[0].dataset.index);
+    state.currentPadHit = hits[0];
+    state.targetPadHit = null;
+    state.toNote = note;
+  } else if (hits.length === 0) {
+    state.currentPadHit = null;
+    state.targetPadHit = null;
+    state.toNote = state.fromNote;
+  }
+  if (state.baseNotes.size > 1 && hits.length >= 1) {
+    state.currentPadHit = hits[0];
+    state.bendDirection = state.initialOrientation;
+    const expression = calcExpressionFromMovement(event, state);
+    const vel = expression ?? state.chordExpression;
+    if (expression !== null) {
+      setEffect(state.groupId, state.channelNumber, expression);
+    }
+    hits.forEach((p) => highlightPad(p, vel));
+  } else {
+    const bend = calcContinuousPitchBend(event, state);
+    midy.setPitchBend(state.channelNumber, bend);
+    const expression = calcExpressionFromMovement(event, state);
+    const vel = expression ?? state.chordExpression;
+    if (expression !== null) {
+      setEffect(state.groupId, state.channelNumber, expression);
+    }
+    hits.forEach((p) => highlightPad(p, vel));
+  }
+}
+
+function handlePointerUp(event) {
+  const state = mpePointers.get(event.pointerId);
+  if (state) {
+    if (state.pressureInterval !== null) {
+      clearInterval(state.pressureInterval);
+      state.pressureInterval = null;
+    }
+    state.padHits.forEach(clearPadColor);
+    state.baseNotes.forEach((note) => midy.noteOff(state.channelNumber, note));
+    midy.setPitchBend(state.channelNumber, 8192);
+    midy.setChannelPressure(state.channelNumber, 0);
+    releaseChannel(state.channelNumber);
+    mpePointers.delete(event.pointerId);
+  }
+  if (mpeHitMap.has(event.pointerId)) {
+    mpeHitMap.get(event.pointerId).clear();
+    mpeHitMap.delete(event.pointerId);
+  }
+  try {
+    panel.releasePointerCapture(event.pointerId);
+  } catch { /* skip */ }
+}
+
+function setMPEKeyEvents(padHit, groupId) {
+  padHit.addEventListener(
+    "pointerdown",
+    (event) => handlePointerDown(event, groupId),
+  );
+}
+
+function isInsidePanel(event) {
+  const rect = panel.getBoundingClientRect();
+  return (
+    event.clientX >= rect.left &&
+    event.clientX <= rect.right &&
+    event.clientY >= rect.top &&
+    event.clientY <= rect.bottom
+  );
+}
+
+function getTranslatedLabel(note) {
+  const map = noteMap[htmlLang];
+  return map[note[0]] + note.slice(1);
+}
+
+// ---- piano keyboard geometry -------------------------------------------
+
+const WHITE_ORDER_FLAT = [
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+  "A",
+  "B",
+];
+const SEMITONE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const BLACK_AFTER = { C: "C#", D: "D#", F: "F#", G: "G#", A: "A#" };
+const TOTAL_WHITE = 14; // white keys per keyboard
+const VIEW_W = TOTAL_WHITE; // SVG viewBox width  (1 unit = 1 white key)
+const VIEW_H = 6; // SVG viewBox height (aspect ratio 14:6)
+const BK_V = 3.6; // black key visual depth (60 % of VIEW_H)
+// Hit-area notch now matches the visual black-key depth exactly. Previously
+// this was shallower (3.0) than BK_V, which left a band directly under each
+// black key where the white key's hit polygon was already full-width while
+// the black key's hit rect was still on top of it — so a single press on
+// the lower half of a black key also registered the white key underneath.
+const WK_HIT_NOTCH = BK_V;
+// Tiny epsilon (not a deliberate overlap) to avoid sub-pixel seams between
+// adjacent hit shapes. Adjacent-key chords are handled separately, at event
+// time, via pure coordinate math — see BOUNDARY_TOLERANCE_RATIO / getPadHits.
+const KEY_OV = 0.001;
+
+// Builds the 24 keys (14 white + 10 black) for a keyboard starting at
+// `baseOctave`. Positions are in SVG user units (1 = one white-key width).
+function buildKeyData(baseOctave) {
+  const keys = [];
+  for (let i = 0; i < TOTAL_WHITE; i++) {
+    const name = WHITE_ORDER_FLAT[i];
+    const octave = baseOctave + Math.floor(i / 7);
+    const midi = (octave + 1) * 12 + SEMITONE[name];
+    const prevName = i > 0 ? WHITE_ORDER_FLAT[i - 1] : null;
+    const leftHasBlack = prevName != null &&
+      BLACK_AFTER[prevName] !== undefined;
+    const rightHasBlack = BLACK_AFTER[name] !== undefined;
+    keys.push({
+      type: "white",
+      name: `${name}${octave}`,
+      midi,
+      pos: i,
+      span: 1,
+      leftCut: leftHasBlack ? 0.3 : 0,
+      rightCut: rightHasBlack ? 0.3 : 0,
+    });
+    if (rightHasBlack) {
+      keys.push({
+        type: "black",
+        name: `${BLACK_AFTER[name]}${octave}`,
+        midi: midi + 1,
+        pos: i + 1 - 0.3,
+        span: 0.6,
+      });
+    }
+  }
+  return keys;
+}
+
+// SVG <polygon> points string for a white key's visual shape (8-point notch).
+function whiteVisualPoints(pos, lc, rc) {
+  const nd = BK_V;
+  return `${pos + lc},0 ${pos + 1 - rc},0 ${pos + 1 - rc},${nd} ${
+    pos + 1
+  },${nd} ` +
+    `${pos + 1},${VIEW_H} ${pos},${VIEW_H} ${pos},${nd} ${pos + lc},${nd}`;
+}
+
+// SVG <polygon> points string for a white key's hit area (shallower notch +
+// small horizontal overlap so pressing at the boundary triggers both keys).
+function whiteHitPoints(pos, lc, rc) {
+  const nd = WK_HIT_NOTCH;
+  const ov = KEY_OV;
+  const x0 = pos - ov, x1 = pos + lc - ov;
+  const x2 = pos + 1 - rc + ov, x3 = pos + 1 + ov;
+  return `${x1},0 ${x2},0 ${x2},${nd} ${x3},${nd} ` +
+    `${x3},${VIEW_H} ${x0},${VIEW_H} ${x0},${nd} ${x1},${nd}`;
+}
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function makeSVGEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+function makeGrad(id, stops) {
+  const g = makeSVGEl("linearGradient", {
+    id,
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1",
+    gradientUnits: "objectBoundingBox",
+  });
+  for (const { offset, cssVar, color } of stops) {
+    const s = makeSVGEl("stop", { offset });
+    if (cssVar) s.style.stopColor = `var(${cssVar})`;
+    else s.setAttribute("stop-color", color);
+    g.append(s);
+  }
+  return g;
+}
+
+// Creates a full SVG keyboard and returns { svg, keyEls }.
+function createSVGKeyboard(keyData, groupId) {
+  const svg = makeSVGEl("svg", {
+    viewBox: `0 0 ${VIEW_W} ${VIEW_H}`,
+    width: "100%",
+    height: "100%",
+    preserveAspectRatio: "xMidYMin meet",
+  });
+  svg.style.display = "block";
+  svg.style.touchAction = "none";
+
+  const defs = makeSVGEl("defs", {});
+  // 3-stop white key gradient via CSS vars (supports dark-mode toggle)
+  defs.append(makeGrad(`wk-${groupId}`, [
+    { offset: "0%", cssVar: "--wk-c0" },
+    { offset: "65%", cssVar: "--wk-c1" },
+    { offset: "100%", cssVar: "--wk-c2" },
+  ]));
+  // Black key gradient (hardcoded — looks same in both themes)
+  defs.append(makeGrad(`bk-${groupId}`, [
+    { offset: "0%", color: "#585050" },
+    { offset: "18%", color: "#1c1818" },
+    { offset: "100%", color: "#040202" },
+  ]));
+  // Drop-shadow for black keys
+  const filt = makeSVGEl("filter", {
+    id: `shad-${groupId}`,
+    x: "-5%",
+    width: "110%",
+    y: "0%",
+    height: "150%",
+  });
+  const ds = makeSVGEl("feDropShadow", {
+    dx: "0",
+    dy: "0.13",
+    stdDeviation: "0.07",
+    "flood-color": "#000",
+    "flood-opacity": "0.5",
+  });
+  filt.append(ds);
+  defs.append(filt);
+  svg.appendChild(defs);
+
+  // Layer groups (SVG paint order = DOM order)
+  const gWV = makeSVGEl("g", {});
+  const gBV = makeSVGEl("g", { filter: `url(#shad-${groupId})` });
+  const gWH = makeSVGEl("g", { "pointer-events": "all" });
+  const gBH = makeSVGEl("g", { "pointer-events": "all" });
+  const gLB = makeSVGEl("g", { "pointer-events": "none" });
+  svg.append(gWV, gBV, gWH, gBH, gLB);
+
+  const keyEls = [];
+  const whites = keyData.filter((d) => d.type === "white");
+  const blacks = keyData.filter((d) => d.type === "black");
+
+  whites.forEach((data, i) => {
+    const vid = `wkv-${groupId}-${i}`;
+
+    // Visual polygon
+    const visual = makeSVGEl("polygon", {
+      id: vid,
+      points: whiteVisualPoints(data.pos, data.leftCut, data.rightCut),
+      fill: `url(#wk-${groupId})`,
+      stroke: "#a0a0a0",
+      "stroke-width": "0.025",
+    });
+    gWV.appendChild(visual);
+    // Front-edge accent (simulates key depth)
+    gWV.appendChild(makeSVGEl("rect", {
+      x: String(data.pos + 0.03),
+      y: String(VIEW_H - 0.22),
+      width: "0.94",
+      height: "0.18",
+      fill: "rgba(0,0,0,0.07)",
+      rx: "0.05",
+    }));
+
+    // Hit polygon — fill-opacity > 0 ensures elementsFromPoint finds it
+    const hit = makeSVGEl("polygon", {
+      points: whiteHitPoints(data.pos, data.leftCut, data.rightCut),
+      fill: "white",
+      "fill-opacity": "0.002",
+      "pointer-events": "all",
+    });
+    hit.classList.add("pad-hit");
+    hit.dataset.index = String(data.midi);
+    hit.dataset.visual = vid;
+    gWH.appendChild(hit);
+    setMPEKeyEvents(hit, groupId);
+
+    const label = makeSVGEl("text", {
+      x: String(data.pos + 0.5),
+      y: String(VIEW_H - 0.36),
+      "text-anchor": "middle",
+      "font-size": "0.3",
+      "font-family": "sans-serif",
+      "font-weight": "bold",
+      fill: "var(--wk-label)",
+    });
+    label.textContent = getTranslatedLabel(data.name);
+    gLB.appendChild(label);
+    keyEls.push({ el: hit, visual, label, data });
+  });
+
+  blacks.forEach((data, i) => {
+    const vid = `bkv-${groupId}-${i}`;
+    const ov = KEY_OV;
+
+    const visual = makeSVGEl("rect", {
+      id: vid,
+      x: String(data.pos),
+      y: "0",
+      width: String(data.span),
+      height: String(BK_V),
+      fill: `url(#bk-${groupId})`,
+      stroke: "#111",
+      "stroke-width": "0.015",
+      rx: "0.07",
+    });
+    gBV.appendChild(visual);
+    // Specular highlight at very top of black key
+    gBV.appendChild(makeSVGEl("rect", {
+      x: String(data.pos + 0.06),
+      y: "0.04",
+      width: String(data.span - 0.12),
+      height: "0.18",
+      fill: "rgba(255,255,255,0.18)",
+      rx: "0.05",
+    }));
+
+    // Hit rect — slightly wider for chord detection; fill-opacity > 0 for reliability
+    const hit = makeSVGEl("rect", {
+      x: String(data.pos - ov),
+      y: "0",
+      width: String(data.span + 2 * ov),
+      height: String(BK_V),
+      fill: "white",
+      "fill-opacity": "0.002",
+      "pointer-events": "all",
+    });
+    hit.classList.add("pad-hit");
+    hit.dataset.index = String(data.midi);
+    hit.dataset.visual = vid;
+    gBH.appendChild(hit);
+    setMPEKeyEvents(hit, groupId);
+
+    const label = makeSVGEl("text", {
+      x: String(data.pos + data.span / 2),
+      y: String(BK_V - 0.2),
+      "text-anchor": "middle",
+      "font-size": "0.2",
+      "font-family": "sans-serif",
+      "font-weight": "bold",
+      fill: "var(--bk-label)",
+    });
+    label.textContent = getTranslatedLabel(data.name);
+    gLB.appendChild(label);
+    keyEls.push({ el: hit, visual, label, data });
+  });
+
+  // Top rail — thin shadow line suggesting the piano body above the keys
+  svg.appendChild(makeSVGEl("rect", {
+    x: "0",
+    y: "0",
+    width: String(VIEW_W),
+    height: "0.09",
+    fill: "rgba(0,0,0,0.18)",
+  }));
+
+  return { svg, keyEls };
+}
+
+function createOctaveBar(groupId) {
+  const bar = document.createElement("div");
+  bar.className = "octave-bar";
+  const down = document.createElement("button");
+  down.type = "button";
+  down.className = "btn btn-lg btn-danger";
+  down.textContent = "⬇";
+  const up = document.createElement("button");
+  up.type = "button";
+  up.className = "btn btn-lg btn-primary";
+  up.textContent = "⬆";
+  down.addEventListener("pointerdown", () => updateOctave(groupId, -1));
+  up.addEventListener("pointerdown", () => updateOctave(groupId, 1));
+  bar.append(down, up);
+  return bar;
+}
+
+function initKeyboards() {
+  const groups = [];
+  document.querySelectorAll(".group").forEach((group, groupId) => {
+    group.appendChild(createOctaveBar(groupId));
+    const area = document.createElement("div");
+    area.className = "keyboard-area";
+    group.appendChild(area);
+
+    const keyData = buildKeyData(baseOctaves[groupId]);
+    const { svg, keyEls } = createSVGKeyboard(keyData, groupId);
+    area.appendChild(svg);
+    groups.push({ svg, area, keyEls });
+  });
+  return groups;
+}
+
+function updateOctave(groupId, direction) {
+  const nextOctave = baseOctaves[groupId] + direction;
+  if (nextOctave < 0 || nextOctave > 8) return;
+  baseOctaves[groupId] = nextOctave;
+  const keyData = buildKeyData(nextOctave);
+  // keyEls is stored whites-first then blacks (same order as createSVGKeyboard)
+  const whites = keyData.filter((d) => d.type === "white");
+  const blacks = keyData.filter((d) => d.type === "black");
+  const ordered = [...whites, ...blacks];
+  keyboardGroups[groupId].keyEls.forEach((entry, i) => {
+    entry.data = ordered[i];
+    entry.el.dataset.index = String(ordered[i].midi);
+    entry.label.textContent = getTranslatedLabel(ordered[i].name);
+  });
+}
+
+function applyOrientation() {
+  const isLandscape = orientationMQ.matches;
+  panel.classList.toggle("layout-landscape", isLandscape);
+  panel.classList.toggle("layout-portrait", !isLandscape);
+}
+
+function initConfig() {
+  const ccHandlers = [
+    (ch, v) => midy.setControlChange(ch, 1, v),
+    (ch, v) => midy.setControlChange(ch, 76, v),
+    (ch, v) => midy.setControlChange(ch, 77, v),
+    (ch, v) => midy.setControlChange(ch, 78, v),
+    (ch, v) => midy.setControlChange(ch, 91, v),
+    (ch, v) => midy.setControlChange(ch, 93, v),
+  ];
+  document.getElementById("config").querySelectorAll("div.col")
+    .forEach((config, groupId) => {
+      const channelNumber = groupId === 0 ? 0 : 15;
+      initMode(config, groupId);
+      initEffect(config, groupId);
+      initDrumToggle(config, channelNumber);
+      initRangeControls(config, channelNumber, ccHandlers);
+    });
+}
+
+function initMode(config, groupId) {
+  const form = config.querySelectorAll("form")[0];
+  form.addEventListener("change", (event) => {
+    bendEnabled[groupId] = event.target.value === "bend";
+  });
+}
+
+function initEffect(config, groupId) {
+  const form = config.querySelectorAll("form")[1];
+  form.addEventListener("change", (event) => {
+    effectTypes[groupId] = event.target.value;
+  });
+}
+
+function initDrumToggle(config, channelNumber) {
+  const checkbox = config.querySelector("input[role=switch]");
+  checkbox.addEventListener("change", (event) => {
+    config.querySelector("midi-instrument").parentNode
+      .classList.toggle("d-none");
+    if (event.target.checked) {
+      midy.setControlChange(channelNumber, 0, 120); // bankMSB
+      midy.setProgramChange(channelNumber, 0);
+    } else {
+      midy.setControlChange(channelNumber, 0, 121); // bankMSB
+      const select = config.querySelector("midi-instrument").shadowRoot
+        .querySelector("select");
+      select.selectedIndex = 0;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+}
+
+function initRangeControls(config, channelNumber, ccHandlers) {
+  config.querySelectorAll("input[type=range]").forEach((input, j) => {
+    const handler = ccHandlers[j];
+    if (!handler) return;
+    input.addEventListener("change", (event) => {
+      handler(channelNumber, event.target.value);
+    });
+  });
+}
+
+const lowerFreeChannels = Array.from({ length: 7 }, (_, i) => i + 1);
+const upperFreeChannels = Array.from({ length: 7 }, (_, i) => i + 8);
+const mpeHitMap = new Map();
+const mpePointers = new Map();
+
+const htmlLang = document.documentElement.lang;
+const noteMap = {
+  ja: { C: "ド", D: "レ", E: "ミ", F: "ファ", G: "ソ", A: "ラ", B: "シ" },
+  en: { C: "C", D: "D", E: "E", F: "F", G: "G", A: "A", B: "B" },
+};
+
+const afterTouchEnabled = true;
+const baseOctaves = [4, 4];
+const effectTypes = ["expression", "expression"];
+const bendEnabled = [false, false];
+let handMode = 1;
+
+const panel = document.getElementById("panel");
+const keyboardGroups = initKeyboards();
+
+const orientationMQ = matchMedia("(orientation: landscape)");
+orientationMQ.addEventListener("change", applyOrientation);
+globalThis.addEventListener("resize", applyOrientation);
+applyOrientation();
+
+// Panel-level move/up/cancel so events reach handlers even when pointer
+// moves outside individual SVG elements (panel already captures the pointer).
+panel.addEventListener("pointermove", handlePointerMove);
+panel.addEventListener("pointerup", handlePointerUp);
+panel.addEventListener("pointercancel", handlePointerUp);
+
+const soundFontURL = "https://soundfonts.pages.dev/GeneralUser_GS_v1.471";
+const audioContext = new AudioContext();
+const midy = new Midy(audioContext);
+await Promise.all([
+  midy.loadSoundFont(`${soundFontURL}/000.sf3`),
+  midy.loadSoundFont(`${soundFontURL}/128.sf3`),
 ]);
+for (let i = 0; i < 16; i++) {
+  midy.channels[i].setPitchBendRange(1200);
+}
+midy.channels[9].setBankMSB(121);
+midy.setProgramChange(9, 0);
+midy.setMIDIPolyphonicExpression(0, 7);
+midy.setMIDIPolyphonicExpression(15, 7);
+initConfig();
 
 document.getElementById("toggleDarkMode").onclick = toggleDarkMode;
-document.getElementById("toggleColor").onclick = toggleRectColor;
-document.ondragover = (e) => {
-  e.preventDefault();
-};
-document.ondrop = dropFileEvent;
-document.getElementById("play").onclick = play;
-document.getElementById("pause").onclick = pause;
-document.getElementById("speed").onchange = changeSpeedEvent;
-document.getElementById("speedDown").onclick = speedDown;
-document.getElementById("speedUp").onclick = speedUp;
-document.getElementById("repeat").onclick = repeat;
-document.getElementById("volumeOnOff").onclick = volumeOnOff;
-document.getElementById("volumebar").onchange = changeVolumebar;
-document.getElementById("seekbar").onchange = changeSeekbar;
-document.getElementById("inputMIDIFile").onchange = loadMIDIFileEvent;
-document.getElementById("inputMIDIUrl").onchange = loadMIDIUrlEvent;
-document.getElementById("inputSoundFontFile").onchange = loadSoundFontFileEvent;
-document.getElementById("inputSoundFontUrl").onchange = loadSoundFontUrlEvent;
-document.getElementById("soundfonts").onchange = changeConfig;
-document.getElementById("instruments").onchange = changeInstrument;
-document.addEventListener("keydown", typeEvent);
-globalThis.addEventListener("resize", resize);
-document.addEventListener("click", unlockAudio);
+document.getElementById("toggleHandMode").onclick = toggleHandMode;
+document.getElementById("lang").onchange = changeLang;
+document.addEventListener("visibilitychange", async () => {
+  if (document.hidden) {
+    if (midy.audioContext.state === "running") {
+      await midy.audioContext.suspend();
+    }
+  } else {
+    if (midy.audioContext.state === "suspended") {
+      await midy.audioContext.resume();
+    }
+  }
+});
+if (CSS.supports("-webkit-touch-callout: default")) { // iOS
+  // prevent double click zoom
+  document.addEventListener("dblclick", (event) => event.preventDefault());
+  // prevent text selection
+  const preventDefault = (event) => event.preventDefault();
+  const panel = document.getElementById("panel");
+  panel.addEventListener("touchstart", () => {
+    document.addEventListener("touchstart", preventDefault, {
+      passive: false,
+    });
+  });
+  panel.addEventListener("touchend", () => {
+    document.removeEventListener("touchstart", preventDefault, {
+      passive: false,
+    });
+  });
+}

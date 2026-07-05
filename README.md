@@ -1,10 +1,15 @@
-# doremi-piano
+# Doremi Piano
 
-Tap piano keys! A waterfall piano style MIDI notes tap game. It is suitable for
-classical music with few instruments.
+A Piano-style MPE MIDI controller powered by Midy.
 
 ## Build
 
 ```
 bash build.sh
 ```
+
+## Attribution
+
+`src/favicon/favicon.svg` is copied from
+[LibreICONS](https://github.com/DiemenDesign/LibreICONS) lincesed under the
+[MIT](https://github.com/DiemenDesign/LibreICONS/blob/master/LICENSE)

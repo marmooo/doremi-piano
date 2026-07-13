@@ -1,6 +1,6 @@
 # Doremi Piano
 
-A Piano-style MPE MIDI controller powered by
+A piano-style MPE MIDI controller powered by
 [Midy](https://github.com/marmooo/midy).
 
 ## Build

@@ -1,4 +1,4 @@
-const cacheName = "2026-07-14 00:00";
+const cacheName = "2026-08-11 00:00";
 const urlsToCache = [
   "/doremi-piano/index.js",
   "/doremi-piano/favicon/favicon.svg",

@@ -1,4 +1,4 @@
-import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.6.4/dist/midy.min.js";
+import { Midy } from "https://cdn.jsdelivr.net/gh/marmooo/midy@0.6.5/dist/midy.min.js";
 
 function toggleDarkMode() {
   const html = document.documentElement;
@@ -79,9 +79,9 @@ async function setProgramChange(event) {
   const bankNumber = channel.isDrum ? 128 : channel.bankLSB;
   const index = midy.soundFontTable[programNumber][bankNumber];
   if (index === undefined) {
+    const bank = bankNumber.toString().padStart(3, "0");
     const program = programNumber.toString().padStart(3, "0");
-    const baseName = bankNumber === 128 ? "128" : program;
-    const path = `${soundFontURL}/${baseName}.sf3`;
+    const path = `${soundFontURL}/${bank}/${program}.sf3`;
     await midy.loadSoundFont(path);
   }
   midy.setProgramChange(channelNumber, programNumber);
@@ -1051,12 +1051,12 @@ panel.addEventListener("pointermove", handlePointerMove);
 panel.addEventListener("pointerup", handlePointerUp);
 panel.addEventListener("pointercancel", handlePointerUp);
 
-const soundFontURL = "https://soundfonts.pages.dev/GeneralUser_GS_v1.471";
+const soundFontURL = "https://soundfonts.pages.dev/GeneralUser_GS_v2.0.3";
 const audioContext = new AudioContext();
 const midy = new Midy(audioContext);
 await Promise.all([
-  midy.loadSoundFont(`${soundFontURL}/000.sf3`),
-  midy.loadSoundFont(`${soundFontURL}/128.sf3`),
+  midy.loadSoundFont(`${soundFontURL}/000/000.sf3`),
+  midy.loadSoundFont(`${soundFontURL}/128/000.sf3`),
 ]);
 for (let i = 0; i < 16; i++) {
   midy.channels[i].setPitchBendRange(1200);
